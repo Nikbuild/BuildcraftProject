@@ -1,0 +1,6 @@
+{
+  "parent": "builtin/entity",
+  "textures": {
+    "layer0": "buildcraft:entity/laser/quarry_marker_laser_guide_wire"
+  }
+}

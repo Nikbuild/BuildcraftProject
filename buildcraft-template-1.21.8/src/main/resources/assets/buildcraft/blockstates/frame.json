@@ -1,0 +1,17 @@
+{
+  "multipart": [
+    { "when": { "corner": "none", "axis": "x" }, "apply": { "model": "buildcraft:block/segment_x" } },
+    { "when": { "corner": "none", "axis": "y" }, "apply": { "model": "buildcraft:block/segment_y" } },
+    { "when": { "corner": "none", "axis": "z" }, "apply": { "model": "buildcraft:block/segment_z" } },
+
+    { "when": { "corner": "xmax_zmax_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom" } },
+    { "when": { "corner": "xmin_zmax_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom", "y": 90 } },
+    { "when": { "corner": "xmax_zmin_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom", "y": 270 } },
+    { "when": { "corner": "xmin_zmin_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom", "y": 180 } },
+
+    { "when": { "corner": "xmax_zmax_top" }, "apply": { "model": "buildcraft:block/corner_top" } },
+    { "when": { "corner": "xmin_zmax_top" }, "apply": { "model": "buildcraft:block/corner_top", "y": 90 } },
+    { "when": { "corner": "xmax_zmin_top" }, "apply": { "model": "buildcraft:block/corner_top", "y": 270 } },
+    { "when": { "corner": "xmin_zmin_top" }, "apply": { "model": "buildcraft:block/corner_top", "y": 180 } }
+  ]
+}

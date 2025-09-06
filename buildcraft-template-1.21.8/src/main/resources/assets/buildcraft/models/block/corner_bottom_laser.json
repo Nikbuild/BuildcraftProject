@@ -1,0 +1,12 @@
+{
+  "ambientocclusion": false,
+  "render_type": "translucent",
+  "textures": {
+    "rod": "buildcraft:block/quarry_marker_laser_guide_wire"
+  },
+  "elements": [
+    { "from": [7, 7, 7], "to": [9, 16, 9],  "faces": { "north": {"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } },
+    { "from": [0, 7, 7], "to": [9, 9, 9],   "faces": { "north": {"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } },
+    { "from": [7, 7, 0], "to": [9, 9, 9],   "faces": { "north": {"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } }
+  ]
+}

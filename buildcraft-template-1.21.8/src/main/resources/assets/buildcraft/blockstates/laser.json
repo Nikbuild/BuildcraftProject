@@ -1,0 +1,17 @@
+{
+  "multipart": [
+    { "when": { "corner": "none", "axis": "x" }, "apply": { "model": "buildcraft:block/segment_x_laser" } },
+    { "when": { "corner": "none", "axis": "y" }, "apply": { "model": "buildcraft:block/segment_y_laser" } },
+    { "when": { "corner": "none", "axis": "z" }, "apply": { "model": "buildcraft:block/segment_z_laser" } },
+
+    { "when": { "corner": "xmax_zmax_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom_laser", "y": 0 } },
+    { "when": { "corner": "xmin_zmax_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom_laser", "y": 90 } },
+    { "when": { "corner": "xmin_zmin_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom_laser", "y": 180 } },
+    { "when": { "corner": "xmax_zmin_bottom" }, "apply": { "model": "buildcraft:block/corner_bottom_laser", "y": 270 } },
+
+    { "when": { "corner": "xmax_zmax_top" }, "apply": { "model": "buildcraft:block/corner_top_laser", "y": 0 } },
+    { "when": { "corner": "xmin_zmax_top" }, "apply": { "model": "buildcraft:block/corner_top_laser", "y": 90 } },
+    { "when": { "corner": "xmin_zmin_top" }, "apply": { "model": "buildcraft:block/corner_top_laser", "y": 180 } },
+    { "when": { "corner": "xmax_zmin_top" }, "apply": { "model": "buildcraft:block/corner_top_laser", "y": 270 } }
+  ]
+}

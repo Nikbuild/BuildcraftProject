@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "buildcraft:block/pipetextures/stone_pipe_texture"
+  }
+}

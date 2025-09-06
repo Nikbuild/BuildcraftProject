@@ -1,0 +1,13 @@
+{
+  "ambientocclusion": false,
+  "render_type": "translucent",
+  "textures": { "rod": "buildcraft:block/frame_rod" },
+  "elements": [
+    { "from": [0, 5, 5], "to": [11, 11, 11],
+      "faces": { "north":{"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } },
+    { "from": [5, 5, 0], "to": [11, 11, 11],
+      "faces": { "north":{"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } },
+    { "from": [5, 5, 5], "to": [11, 16, 11],
+      "faces": { "north":{"texture":"#rod"}, "south":{"texture":"#rod"}, "west":{"texture":"#rod"}, "east":{"texture":"#rod"}, "up":{"texture":"#rod"}, "down":{"texture":"#rod"} } }
+  ]
+}

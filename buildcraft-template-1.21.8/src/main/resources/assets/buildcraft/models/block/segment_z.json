@@ -1,0 +1,19 @@
+{
+  "ambientocclusion": false,
+  "render_type": "translucent",
+  "textures": { "rod": "buildcraft:block/frame_rod" },
+  "elements": [
+    {
+      "from": [5, 5, 0],
+      "to":   [11, 11, 16],
+      "faces": {
+        "north": {"texture": "#rod"},
+        "south": {"texture": "#rod"},
+        "west":  {"texture": "#rod"},
+        "east":  {"texture": "#rod"},
+        "up":    {"texture": "#rod"},
+        "down":  {"texture": "#rod"}
+      }
+    }
+  ]
+}

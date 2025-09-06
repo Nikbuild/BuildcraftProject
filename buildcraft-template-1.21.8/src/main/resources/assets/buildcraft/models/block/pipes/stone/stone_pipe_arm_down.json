@@ -1,0 +1,4 @@
+{
+  "parent": "buildcraft:block/pipes/_template/pipe_arm_down",
+  "textures": { "pipe": "buildcraft:block/pipetextures/stone_pipe_texture" }
+}

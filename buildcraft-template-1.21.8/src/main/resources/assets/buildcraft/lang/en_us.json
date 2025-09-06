@@ -1,0 +1,13 @@
+{
+  "block.buildcraft.quarry": "Quarry",
+  "item.buildcraft.quarry": "Quarry",
+
+  "block.buildcraft.stone_pipe": "Stone Pipe",
+  "item.buildcraft.stone_pipe": "Stone Pipe",
+
+  "block.buildcraft.cobble_pipe": "Cobblestone Pipe",
+  "item.buildcraft.cobble_pipe": "Cobblestone Pipe",
+
+
+  "itemGroup.buildcraft": "BuildCraft"
+}

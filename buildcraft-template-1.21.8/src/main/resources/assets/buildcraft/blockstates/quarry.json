@@ -1,0 +1,8 @@
+{
+  "multipart": [
+    { "when": { "facing": "north" }, "apply": { "model": "buildcraft:block/quarry" } },
+    { "when": { "facing": "south" }, "apply": { "model": "buildcraft:block/quarry", "y": 180 } },
+    { "when": { "facing": "west"  }, "apply": { "model": "buildcraft:block/quarry", "y": 270 } },
+    { "when": { "facing": "east"  }, "apply": { "model": "buildcraft:block/quarry", "y": 90  } }
+  ]
+}

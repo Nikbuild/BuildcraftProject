@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "IRI",
+    "GIG",
+    "DMD"
+  ],
+  "key": {
+    "I": "buildcraft:gear_iron",
+    "R": "minecraft:redstone",
+    "G": "buildcraft:gear_gold",
+    "D": "buildcraft:gear_diamond",
+    "M": "minecraft:diamond_pickaxe"
+  },
+  "result": {
+    "id": "buildcraft:model_item_quarry_controller",
+    "count": 1
+  }
+}

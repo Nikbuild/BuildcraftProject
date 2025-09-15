@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    "S S",
+    " S "
+  ],
+  "key": {
+    "S": "minecraft:stick"
+  },
+  "result": { "id": "buildcraft:gear_wood", "count": 1 }
+}

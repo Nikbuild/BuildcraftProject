@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["SGS"],
+  "key": {
+    "S": "minecraft:gold_ingot",
+    "G": "minecraft:glass"
+  },
+  "result": { "id": "buildcraft:gold_pipe", "count": 8 }
+}
+

@@ -1,6 +1,7 @@
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
+import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
@@ -20,9 +21,9 @@ public final class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS =
             DeferredRegister.createBlocks(BuildCraft.MODID);
 
-    /** Quarry controller block */
-    public static final DeferredBlock<Block> QUARRY = BLOCKS.register(
-            "quarry",
+    /** Quarry controller block (id intentionally matches the blockstate file name). */
+    public static final DeferredBlock<Block> QUARRY_CONTROLLER = BLOCKS.register(
+            "blockstate_quarry_controller",
             () -> new QuarryBlock(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
@@ -30,10 +31,11 @@ public final class ModBlocks {
                             .requiresCorrectToolForDrops()
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "quarry")
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_quarry_controller")
                             ))
             )
     );
+
 
     /** Render-only quarry frame */
     public static final DeferredBlock<Block> FRAME = BLOCKS.register(
@@ -136,6 +138,20 @@ public final class ModBlocks {
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
                                     ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "wood_pipe")
+                            ))
+            )
+    );
+
+    /* -------- New: Redstone Engine -------- */
+    public static final DeferredBlock<Block> REDSTONE_ENGINE = BLOCKS.register(
+            "blockstate_redstone_engine", // was "redstone_engine"
+            () -> new RedstoneEngineBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .strength(2.0F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_redstone_engine") // was "redstone_engine"
                             ))
             )
     );

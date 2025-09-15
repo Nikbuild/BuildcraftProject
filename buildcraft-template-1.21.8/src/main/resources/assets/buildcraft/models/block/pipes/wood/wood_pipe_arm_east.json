@@ -1,0 +1,4 @@
+{
+  "parent": "buildcraft:block/pipes/_template/pipe_arm_east",
+  "textures": { "pipe": "buildcraft:block/pipetextures/wood_pipe_texture" }
+}

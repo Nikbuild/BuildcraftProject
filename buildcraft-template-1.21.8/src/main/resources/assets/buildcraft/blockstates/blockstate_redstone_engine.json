@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "part=base,powered=true":  { "model": "buildcraft:block/engines/redstone/redstone_engine" },
+    "part=base,powered=false": { "model": "buildcraft:block/engines/redstone/redstone_engine" },
+
+    "part=ring,powered=true":  { "model": "buildcraft:block/engines/redstone/redstone_engine_ring" },
+    "part=ring,powered=false": { "model": "buildcraft:block/engines/redstone/redstone_engine_ring" },
+
+    "part=bellows,powered=true":  { "model": "buildcraft:block/engines/redstone/redstone_engine_bellows" },
+    "part=bellows,powered=false": { "model": "buildcraft:block/engines/redstone/redstone_engine_bellows" }
+  }
+}

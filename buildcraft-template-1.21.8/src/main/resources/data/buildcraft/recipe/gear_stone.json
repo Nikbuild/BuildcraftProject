@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    "SWS",
+    " S "
+  ],
+  "key": {
+    "W": "buildcraft:gear_wood",
+    "S": "minecraft:stone"
+  },
+  "result": { "id": "buildcraft:gear_stone", "count": 1 }
+}

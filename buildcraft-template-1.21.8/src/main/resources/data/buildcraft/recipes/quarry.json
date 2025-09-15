@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DDD",
+    "   ",
+    "   "
+  ],
+  "key": {
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": { "id": "buildcraft:model_item_quarry_controller", "count": 1 }
+}

@@ -29,6 +29,9 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
+import com.nick.buildcraft.energy.BCEnergyStorage;
+import com.nick.buildcraft.energy.Energy;
+
 
 import java.util.*;
 
@@ -132,7 +135,7 @@ public class QuarryBlockEntity extends BlockEntity {
     private boolean allowFlushAfterPowerOn = false;
 
     public QuarryBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntity.QUARRY.get(), pos, state);
+        super(ModBlockEntity.QUARRY_CONTROLLER.get(), pos, state);
     }
 
     @Override
@@ -188,7 +191,7 @@ public class QuarryBlockEntity extends BlockEntity {
         if (!be.frameComplete) be.ensurePlacementLasers((ServerLevel) level);
         else be.clearPlacementLasers((ServerLevel) level);
 
-        if (!be.isPowered(level, pos, state)) {
+        if (!be.hasWorkPower()) {
             be.frameTickCounter = 0;
             be.lastMined = null;
 
@@ -208,7 +211,7 @@ public class QuarryBlockEntity extends BlockEntity {
             be.finalSweepCheckedThisLayer = false;
             be.finalSweepTargets.clear();
 
-            // Gate outputs on power-off so no flush happens on next power-on until we mine.
+            // Gate outputs on power-loss so no flush happens on next power-on until we mine.
             be.allowFlushAfterPowerOn = false;
 
             be.markForSync();
@@ -494,6 +497,12 @@ public class QuarryBlockEntity extends BlockEntity {
 
         if (shouldMine(level, p)) {
             if (!QuarryBalancer.tryConsumeToken(level)) { return; }
+
+            // Energy gate: require FE for this operation
+            if (energy.extractEnergy(Energy.QUARRY_ENERGY_PER_OPERATION, true) < Energy.QUARRY_ENERGY_PER_OPERATION) {
+                return; // not enough FE yet
+            }
+            energy.extractEnergy(Energy.QUARRY_ENERGY_PER_OPERATION, false);
 
             final boolean handledOverride = (overrideMineY != null);
 
@@ -1042,6 +1051,22 @@ public class QuarryBlockEntity extends BlockEntity {
     /*  UTIL                                                                   */
     /* ====================================================================== */
 
+    // --- energy buffer (engines push FE here) ---
+    private final BCEnergyStorage energy =
+            new BCEnergyStorage(Energy.ENGINE_BUFFER, Energy.ENGINE_MAX_IO, s -> setChanged());
+
+    /** Exposed via ModCapabilities.EnergyStorage so engines can push FE. */
+    public BCEnergyStorage getEnergyStorage() { return energy; }
+
+
+    /** True if we have enough FE buffered to perform one mining action. */
+    private boolean hasWorkPower() {
+        return energy.getEnergyStored() >= Energy.QUARRY_ENERGY_PER_OPERATION;
+    }
+
+
+
+
     private boolean isPowered(Level level, BlockPos pos, BlockState state) {
         if (state.hasProperty(BlockStateProperties.POWERED)) return state.getValue(BlockStateProperties.POWERED);
         return level.hasNeighborSignal(pos);
@@ -1176,9 +1201,13 @@ public class QuarryBlockEntity extends BlockEntity {
             st.ifPresent(outputQueue::addLast);
         }
 
+        // energy buffer
+        in.child("Energy").ifPresent(child -> this.energy.deserialize(child));
+
         // On world load, keep the gate closed until we mine something.
         allowFlushAfterPowerOn = false;
     }
+
 
     @Override
     protected void saveAdditional(ValueOutput out) {
@@ -1199,6 +1228,9 @@ public class QuarryBlockEntity extends BlockEntity {
         for (ItemStack s : outputQueue) {
             out.store("OutQ_" + (i++), ItemStack.CODEC, s);
         }
+
+        // energy buffer
+        this.energy.serialize(out.child("Energy"));
     }
 
     /** Packet the server sends when you call sendBlockUpdated in markForSync(). */

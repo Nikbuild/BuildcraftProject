@@ -100,12 +100,12 @@ public class QuarryBlock extends Block implements EntityBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return ModBlockEntity.QUARRY.get().create(pos, state);
+        return ModBlockEntity.QUARRY_CONTROLLER.get().create(pos, state);
     }
 
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return type == ModBlockEntity.QUARRY.get() && !level.isClientSide
+        return type == ModBlockEntity.QUARRY_CONTROLLER.get() && !level.isClientSide
                 ? (lvl, p, st, be) -> QuarryBlockEntity.serverTick(lvl, p, st, (QuarryBlockEntity) be)
                 : null;
     }

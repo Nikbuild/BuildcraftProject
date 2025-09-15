@@ -36,18 +36,28 @@ public class BuildCraft {
                     () -> CreativeModeTab.builder()
                             .title(Component.translatable("itemGroup.buildcraft"))
                             .withTabsBefore(CreativeModeTabs.COMBAT)
-                            .icon(() -> ModItems.QUARRY_ITEM.get().getDefaultInstance())
+                            .icon(() -> ModItems.QUARRY_CONTROLLER_ITEM.get().getDefaultInstance())
                             .displayItems((params, out) -> {
-                                // Blocks/items we always want visible in our tab
-                                out.accept(ModItems.QUARRY_ITEM.get());
+                                // Always-visible items in the BuildCraft tab
+                                out.accept(ModItems.QUARRY_CONTROLLER_ITEM.get());
 
-                                // All pipe variants
+                                // Pipes
                                 out.accept(ModItems.STONE_PIPE_ITEM.get());
                                 out.accept(ModItems.COBBLE_PIPE_ITEM.get());
                                 out.accept(ModItems.WOOD_PIPE_ITEM.get());
                                 out.accept(ModItems.IRON_PIPE_ITEM.get());
                                 out.accept(ModItems.GOLD_PIPE_ITEM.get());
                                 out.accept(ModItems.DIAMOND_PIPE_ITEM.get());
+
+                                // Engines
+                                out.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE.get());
+
+                                // Gears (if present in ModItems)
+                                out.accept(ModItems.GEAR_WOOD);
+                                out.accept(ModItems.GEAR_STONE);
+                                out.accept(ModItems.GEAR_IRON);
+                                out.accept(ModItems.GEAR_GOLD);
+                                out.accept(ModItems.GEAR_DIAMOND);
                             })
                             .build()
             );
@@ -76,19 +86,34 @@ public class BuildCraft {
     }
 
     /**
-     * Add items to vanilla tabs as well, so players can find them without switching tabs.
+     * Also surface content in vanilla tabs so it’s easy to find.
      */
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(ModItems.QUARRY_ITEM);
+            event.accept(ModItems.QUARRY_CONTROLLER_ITEM);
 
-            // All pipe variants in vanilla Building Blocks tab
+            // Pipes (vanilla Building Blocks tab)
             event.accept(ModItems.STONE_PIPE_ITEM);
             event.accept(ModItems.COBBLE_PIPE_ITEM);
             event.accept(ModItems.WOOD_PIPE_ITEM);
             event.accept(ModItems.IRON_PIPE_ITEM);
             event.accept(ModItems.GOLD_PIPE_ITEM);
             event.accept(ModItems.DIAMOND_PIPE_ITEM);
+
+            // Engines that are also "placeable blocks"
+            event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
+
+            // Gears (if present)
+            event.accept(ModItems.GEAR_WOOD);
+            event.accept(ModItems.GEAR_STONE);
+            event.accept(ModItems.GEAR_IRON);
+            event.accept(ModItems.GEAR_GOLD);
+            event.accept(ModItems.GEAR_DIAMOND);
+        }
+
+        // It also makes sense to show engines in the Redstone tab
+        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
+            event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
         }
     }
 

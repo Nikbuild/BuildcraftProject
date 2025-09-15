@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["SGS"],
+  "key": {
+    "S": "minecraft:diamond",
+    "G": "minecraft:glass"
+  },
+  "result": { "id": "buildcraft:diamond_pipe", "count": 8 }
+}
+

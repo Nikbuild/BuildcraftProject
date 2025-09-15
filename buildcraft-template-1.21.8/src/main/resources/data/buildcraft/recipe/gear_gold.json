@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    "SWS",
+    " S "
+  ],
+  "key": {
+    "W": "buildcraft:gear_iron",
+    "S": "minecraft:gold_ingot"
+  },
+  "result": { "id": "buildcraft:gear_gold", "count": 1 }
+}

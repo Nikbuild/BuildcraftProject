@@ -21,9 +21,15 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> QUARRY_CONTROLLER_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_quarry_controller", ModBlocks.QUARRY_CONTROLLER);
 
-    /** Redstone Engine block item */
+    /** Engine block items */
     public static final DeferredItem<BlockItem> MODEL_ITEM_REDSTONE_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_redstone_engine", ModBlocks.REDSTONE_ENGINE);
+
+    public static final DeferredItem<BlockItem> MODEL_ITEM_STEAM_ENGINE =
+            ITEMS.registerSimpleBlockItem("model_item_steam_engine", ModBlocks.STEAM_ENGINE);
+
+    public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
+            ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);
 
     /** Pipes */
     public static final DeferredItem<BlockItem> STONE_PIPE_ITEM =

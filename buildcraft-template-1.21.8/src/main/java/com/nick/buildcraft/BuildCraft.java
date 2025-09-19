@@ -51,8 +51,10 @@ public class BuildCraft {
 
                                 // Engines
                                 out.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE.get());
+                                out.accept(ModItems.MODEL_ITEM_STEAM_ENGINE.get());
+                                out.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE.get());
 
-                                // Gears (if present in ModItems)
+                                // Gears
                                 out.accept(ModItems.GEAR_WOOD);
                                 out.accept(ModItems.GEAR_STONE);
                                 out.accept(ModItems.GEAR_IRON);
@@ -85,9 +87,7 @@ public class BuildCraft {
         LOGGER.info("BuildCraft common setup ready");
     }
 
-    /**
-     * Also surface content in vanilla tabs so it’s easy to find.
-     */
+    /** Also surface content in vanilla tabs so it’s easy to find. */
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(ModItems.QUARRY_CONTROLLER_ITEM);
@@ -102,8 +102,10 @@ public class BuildCraft {
 
             // Engines that are also "placeable blocks"
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_STEAM_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
 
-            // Gears (if present)
+            // Gears
             event.accept(ModItems.GEAR_WOOD);
             event.accept(ModItems.GEAR_STONE);
             event.accept(ModItems.GEAR_IRON);
@@ -111,9 +113,11 @@ public class BuildCraft {
             event.accept(ModItems.GEAR_DIAMOND);
         }
 
-        // It also makes sense to show engines in the Redstone tab
+        // Engines make sense in Redstone tab too
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_STEAM_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
         }
     }
 

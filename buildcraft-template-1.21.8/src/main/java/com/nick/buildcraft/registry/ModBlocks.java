@@ -1,7 +1,10 @@
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
+import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
+import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
+import com.nick.buildcraft.content.block.engine.SteamEngineBlock;
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
@@ -21,7 +24,6 @@ public final class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS =
             DeferredRegister.createBlocks(BuildCraft.MODID);
 
-    /** Quarry controller block (id intentionally matches the blockstate file name). */
     public static final DeferredBlock<Block> QUARRY_CONTROLLER = BLOCKS.register(
             "blockstate_quarry_controller",
             () -> new QuarryBlock(
@@ -36,8 +38,6 @@ public final class ModBlocks {
             )
     );
 
-
-    /** Render-only quarry frame */
     public static final DeferredBlock<Block> FRAME = BLOCKS.register(
             "frame",
             () -> new FrameBlock(
@@ -52,7 +52,6 @@ public final class ModBlocks {
             )
     );
 
-    /** Stone transport pipe */
     public static final DeferredBlock<Block> STONE_PIPE = BLOCKS.register(
             "stone_pipe",
             () -> new StonePipeBlock(
@@ -67,7 +66,6 @@ public final class ModBlocks {
             )
     );
 
-    /** Cobblestone transport pipe */
     public static final DeferredBlock<Block> COBBLE_PIPE = BLOCKS.register(
             "cobble_pipe",
             () -> new CobblePipeBlock(
@@ -82,7 +80,6 @@ public final class ModBlocks {
             )
     );
 
-    // GOLD pipe
     public static final DeferredBlock<Block> GOLD_PIPE = BLOCKS.register(
             "gold_pipe",
             () -> new com.nick.buildcraft.content.block.pipe.GoldPipeBlock(
@@ -97,7 +94,6 @@ public final class ModBlocks {
             )
     );
 
-    // IRON pipe
     public static final DeferredBlock<Block> IRON_PIPE = BLOCKS.register(
             "iron_pipe",
             () -> new com.nick.buildcraft.content.block.pipe.IronPipeBlock(
@@ -112,7 +108,6 @@ public final class ModBlocks {
             )
     );
 
-    // DIAMOND pipe
     public static final DeferredBlock<Block> DIAMOND_PIPE = BLOCKS.register(
             "diamond_pipe",
             () -> new com.nick.buildcraft.content.block.pipe.DiamondPipeBlock(
@@ -127,7 +122,6 @@ public final class ModBlocks {
             )
     );
 
-    // WOOD pipe
     public static final DeferredBlock<Block> WOOD_PIPE = BLOCKS.register(
             "wood_pipe",
             () -> new com.nick.buildcraft.content.block.pipe.WoodPipeBlock(
@@ -142,18 +136,58 @@ public final class ModBlocks {
             )
     );
 
-    /* -------- New: Redstone Engine -------- */
+    /* -------- Engines (shared BE) -------- */
     public static final DeferredBlock<Block> REDSTONE_ENGINE = BLOCKS.register(
-            "blockstate_redstone_engine", // was "redstone_engine"
+            "blockstate_redstone_engine",
             () -> new RedstoneEngineBlock(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
                             .strength(2.0F, 6.0F)
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_redstone_engine") // was "redstone_engine"
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_redstone_engine")
                             ))
             )
     );
 
+    public static final DeferredBlock<Block> STEAM_ENGINE = BLOCKS.register(
+            "blockstate_steam_engine",
+            () -> new SteamEngineBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_LIGHT_GRAY)
+                            .strength(2.5F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_steam_engine")
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> COMBUSTION_ENGINE = BLOCKS.register(
+            "blockstate_combustion_engine",
+            () -> new CombustionEngineBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_ORANGE)
+                            .strength(3.0F, 9.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_combustion_engine")
+                            ))
+            )
+    );
+
+    /** Invisible helper block used only during the ring animation. */
+    public static final DeferredBlock<Block> MOVING_ENGINE_RING = BLOCKS.register(
+            "moving_engine_ring",
+            () -> new MovingEngineRingBlock(
+                    BlockBehaviour.Properties.of()
+                            .noOcclusion()
+                            .strength(0.5F)
+                            .noLootTable()
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "moving_engine_ring")
+                            ))
+            )
+    );
 }

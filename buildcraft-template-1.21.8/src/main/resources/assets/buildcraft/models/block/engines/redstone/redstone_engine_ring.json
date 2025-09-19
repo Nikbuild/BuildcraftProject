@@ -4,15 +4,9 @@
     "particle": "buildcraft:block/engines/redstone_engine/side"
   },
   "elements": [
-    { "from":[0,4,0], "to":[16,8,16],
-      "faces":{
-        "down":{"texture":"#ring","uv":[0,0,16,8]},
-        "up":{"texture":"#ring","uv":[0,0,16,8]},
-        "north":{"texture":"#ring","uv":[0,0,16,8]},
-        "south":{"texture":"#ring","uv":[0,0,16,8]},
-        "west":{"texture":"#ring","uv":[0,0,16,8]},
-        "east":{"texture":"#ring","uv":[0,0,16,8]}
-      }
-    }
+    { "from": [0, 4, 0],  "to": [16, 8, 4],  "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"}, "north":{"texture":"#ring"}, "south":{"texture":"#ring"}, "west":{"texture":"#ring"}, "east":{"texture":"#ring"} }},
+    { "from": [0, 4, 12], "to": [16, 8, 16], "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"}, "north":{"texture":"#ring"}, "south":{"texture":"#ring"}, "west":{"texture":"#ring"}, "east":{"texture":"#ring"} }},
+    { "from": [0, 4, 4],  "to": [4,  8, 12], "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"}, "north":{"texture":"#ring"}, "south":{"texture":"#ring"}, "west":{"texture":"#ring"}, "east":{"texture":"#ring"} }},
+    { "from": [12,4, 4],  "to": [16, 8, 12], "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"}, "north":{"texture":"#ring"}, "south":{"texture":"#ring"}, "west":{"texture":"#ring"}, "east":{"texture":"#ring"} }}
   ]
 }

@@ -5,8 +5,8 @@ import com.nick.buildcraft.client.render.QuarryRenderer;
 import com.nick.buildcraft.client.render.RedstoneEngineRenderer;
 import com.nick.buildcraft.client.render.StonePipeRenderer;
 import com.nick.buildcraft.registry.ModBlockEntity;
-import com.nick.buildcraft.registry.ModEntities;
 import com.nick.buildcraft.registry.ModBlocks;
+import com.nick.buildcraft.registry.ModEntities;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
@@ -38,12 +38,11 @@ public final class BuildCraftClient {
         BuildCraft.LOGGER.info("Logged-in player (client): {}", user);
 
         // Ensure engine/bellows models using alpha render correctly
-        event.enqueueWork(() ->
-                ItemBlockRenderTypes.setRenderLayer(
-                        ModBlocks.REDSTONE_ENGINE.get(),
-                        ChunkSectionLayer.CUTOUT
-                )
-        );
+        event.enqueueWork(() -> {
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.REDSTONE_ENGINE.get(), ChunkSectionLayer.CUTOUT);
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.STEAM_ENGINE.get(), ChunkSectionLayer.CUTOUT);
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.COMBUSTION_ENGINE.get(), ChunkSectionLayer.CUTOUT);
+        });
     }
 
     /** Register entity and block-entity renderers. */
@@ -55,6 +54,7 @@ public final class BuildCraftClient {
         // Block entities
         event.registerBlockEntityRenderer(ModBlockEntity.QUARRY_CONTROLLER.get(), QuarryRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntity.STONE_PIPE.get(), StonePipeRenderer::new);
-        event.registerBlockEntityRenderer(ModBlockEntity.REDSTONE_ENGINE.get(), RedstoneEngineRenderer::new);
+        // Shared engine BE -> renderer that handles redstone visuals if applicable
+        event.registerBlockEntityRenderer(ModBlockEntity.ENGINE.get(), RedstoneEngineRenderer::new);
     }
 }

@@ -1,3 +1,4 @@
+// src/main/java/com/nick/buildcraft/content/block/engine/EngineType.java
 package com.nick.buildcraft.content.block.engine;
 
 import com.nick.buildcraft.energy.Energy;
@@ -13,13 +14,16 @@ public enum EngineType {
             StrokeProfiles.BANG_RETURN,
             RingShapes.HOLLOW_FRAME
     )),
-    STEAM(new EngineSpec(
+
+    // Make Stirling “pump” like Redstone: same stroke profile & steps.
+    STIRLING(new EngineSpec(
             /* warmup */ 120,
             /* gen    */ 8, 16, 32,
-            /* steps  */ 0.07f, 0.03f,
-            StrokeProfiles.SMOOTH,
+            /* steps  */ 1.0f, 0.03f,             // bang up, glide down (same feel)
+            StrokeProfiles.BANG_RETURN,           // oscillates while burning
             RingShapes.SOLID_PLATE
     )),
+
     COMBUSTION(new EngineSpec(
             /* warmup */ 300,
             /* gen    */ 20, 60, 120,

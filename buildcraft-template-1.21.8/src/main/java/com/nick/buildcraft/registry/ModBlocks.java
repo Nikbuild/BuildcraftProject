@@ -4,7 +4,7 @@ import com.nick.buildcraft.BuildCraft;
 import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
-import com.nick.buildcraft.content.block.engine.SteamEngineBlock;
+import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
@@ -136,7 +136,7 @@ public final class ModBlocks {
             )
     );
 
-    /* -------- Engines (shared BE) -------- */
+    /* -------- Engines -------- */
     public static final DeferredBlock<Block> REDSTONE_ENGINE = BLOCKS.register(
             "blockstate_redstone_engine",
             () -> new RedstoneEngineBlock(
@@ -150,15 +150,15 @@ public final class ModBlocks {
             )
     );
 
-    public static final DeferredBlock<Block> STEAM_ENGINE = BLOCKS.register(
-            "blockstate_steam_engine",
-            () -> new SteamEngineBlock(
+    public static final DeferredBlock<Block> STIRLING_ENGINE = BLOCKS.register(
+            "blockstate_stirling_engine",
+            () -> new StirlingEngineBlock(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.COLOR_LIGHT_GRAY)
                             .strength(2.5F, 6.0F)
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_steam_engine")
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_stirling_engine")
                             ))
             )
     );

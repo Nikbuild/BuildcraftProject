@@ -21,7 +21,7 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
 
     private static final double PUSH_EPSILON = 1.0E-5;
 
-    private final EngineType type;
+    protected final EngineType type;     // <- protected for subclasses
 
     private float  progress  = 0.0f; // [0..1]
     private float  progressO = 0.0f; // [0..1]
@@ -61,11 +61,11 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
         be.tick(level, pos, state);
     }
 
-    private void tick(Level level, BlockPos pos, BlockState state) {
+    /** Made protected so SteamEngineBlockEntity can reuse it. */
+    protected void tick(Level level, BlockPos pos, BlockState state) {
         boolean powered = isActive(state);
         progressO = progress;
 
-        // Pass the current “armed” flag into the profile and read it back out.
         boolean[] flag = new boolean[]{ this.armed };
         float next = type.spec.stroke().next(
                 progress, powered,

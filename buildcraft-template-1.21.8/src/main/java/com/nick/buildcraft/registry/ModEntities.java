@@ -17,7 +17,7 @@ public class ModEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<LaserEntity>> LASER =
             ENTITIES.register("laser",
                     () -> EntityType.Builder.<LaserEntity>of(LaserEntity::new, MobCategory.MISC)
-                            .sized(0.1f, 0.1f) // thin beam entity
+                            .sized(0.1f, 0.1f)
                             .build(ResourceKey.create(
                                     Registries.ENTITY_TYPE,
                                     ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "laser")

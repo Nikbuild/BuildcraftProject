@@ -5,6 +5,8 @@ import com.nick.buildcraft.content.block.engine.EngineBlock;
 import com.nick.buildcraft.content.block.engine.EngineBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineRingMovingBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineType;
+import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
+import com.nick.buildcraft.content.block.engine.StirlingEngineBlockEntity;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
 import net.minecraft.core.registries.Registries;
@@ -42,19 +44,27 @@ public final class ModBlockEntity {
                             ))
             );
 
-    /** Shared BE for all engines (redstone/steam/combustion) */
+    /**
+     * Engines share one BE type. The factory returns the correct subclass:
+     * - Stirling -> StirlingEngineBlockEntity (has fuel slot)
+     * - Others   -> EngineBlockEntity (shared logic)
+     */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EngineBlockEntity>> ENGINE =
             BLOCK_ENTITY_TYPES.register("engine",
                     () -> new BlockEntityType<>(
                             (pos, state) -> {
+                                if (state.getBlock() instanceof StirlingEngineBlock) {
+                                    return new StirlingEngineBlockEntity(pos, state);
+                                }
                                 if (state.getBlock() instanceof EngineBlock eb) {
                                     return new EngineBlockEntity(eb.engineType(), pos, state);
                                 }
+                                // Fallback (defensive)
                                 return new EngineBlockEntity(EngineType.REDSTONE, pos, state);
                             },
                             Set.of(
                                     ModBlocks.REDSTONE_ENGINE.get(),
-                                    ModBlocks.STEAM_ENGINE.get(),
+                                    ModBlocks.STIRLING_ENGINE.get(),
                                     ModBlocks.COMBUSTION_ENGINE.get()
                             ))
             );

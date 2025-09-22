@@ -45,14 +45,20 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
     public static final BooleanProperty UP    = BlockStateProperties.UP;
     public static final BooleanProperty DOWN  = BlockStateProperties.DOWN;
 
-    // shapes (4px arms + 4px core)
-    private static final VoxelShape CORE  = Block.box(6, 6, 6, 10, 10, 10);
-    private static final VoxelShape ARM_N = Block.box(6, 6, 0, 10, 10, 6);
-    private static final VoxelShape ARM_S = Block.box(6, 6, 10, 10, 10, 16);
-    private static final VoxelShape ARM_W = Block.box(0, 6, 6, 6, 10, 10);
-    private static final VoxelShape ARM_E = Block.box(10, 6, 6, 16, 10, 10);
-    private static final VoxelShape ARM_U = Block.box(6, 10, 6, 10, 16, 10);
-    private static final VoxelShape ARM_D = Block.box(6, 0, 6, 10, 6, 10);
+    // shapes (8px arms + 8px core)  ← was 4px
+    private static final VoxelShape CORE  = Block.box(4, 4, 4, 12, 12, 12);
+    private static final VoxelShape ARM_N = Block.box(4, 4, 0, 12, 12, 4);
+    private static final VoxelShape ARM_S = Block.box(4, 4, 12, 12, 12, 16);
+    private static final VoxelShape ARM_W = Block.box(0, 4, 4, 4, 12, 12);
+    private static final VoxelShape ARM_E = Block.box(12, 4, 4, 16, 12, 12);
+    private static final VoxelShape ARM_U = Block.box(4, 12, 4, 12, 16, 12);
+    private static final VoxelShape ARM_D = Block.box(4, 0, 4, 12, 4, 12);
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        return getShape(state, level, pos, ctx);
+    }
+
 
     protected BaseItemPipeBlock(PipeFamily family, BlockBehaviour.Properties props) {
         super(props);
@@ -128,6 +134,17 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
         };
     }
 
+    /* ---------- NEW: hide faces toward connected neighbor pipes ---------- */
+
+    @Override
+    public boolean skipRendering(BlockState self, BlockState other, Direction dir) {
+        if (other.getBlock() instanceof BaseItemPipeBlock) {
+            BooleanProperty p = prop(dir);
+            if (self.hasProperty(p) && self.getValue(p)) return true;
+        }
+        return super.skipRendering(self, other, dir);
+    }
+
     /* ---------- connectivity policy ---------- */
 
     /**
@@ -183,5 +200,4 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
     }
 
     /* ---------- extra nudges (belt + suspenders) ---------- */
-    
 }

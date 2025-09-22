@@ -13,7 +13,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
  * - ItemHandler: placeholder (null until inventory is added).
  * - EnergyStorage: sink so engines can push FE into the quarry controller.
  */
-@EventBusSubscriber(modid = BuildCraft.MODID) // no Bus enum on NeoForge 21
+@EventBusSubscriber(modid = BuildCraft.MODID) // NeoForge 21: default bus is MOD
 public final class ModCapabilities {
     private ModCapabilities() {}
 

@@ -25,8 +25,8 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> MODEL_ITEM_REDSTONE_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_redstone_engine", ModBlocks.REDSTONE_ENGINE);
 
-    public static final DeferredItem<BlockItem> MODEL_ITEM_STEAM_ENGINE =
-            ITEMS.registerSimpleBlockItem("model_item_steam_engine", ModBlocks.STEAM_ENGINE);
+    public static final DeferredItem<BlockItem> MODEL_ITEM_STIRLING_ENGINE =
+            ITEMS.registerSimpleBlockItem("model_item_stirling_engine", ModBlocks.STIRLING_ENGINE);
 
     public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);

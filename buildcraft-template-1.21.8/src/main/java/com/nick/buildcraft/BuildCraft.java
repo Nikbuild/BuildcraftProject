@@ -5,12 +5,12 @@ import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModBlocks;
 import com.nick.buildcraft.registry.ModEntities;
 import com.nick.buildcraft.registry.ModItems;
+import com.nick.buildcraft.registry.ModMenus;        // ← NEW
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
@@ -27,7 +27,6 @@ public class BuildCraft {
     public static final String MODID = "buildcraft";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    // ---- Creative tab ----
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
@@ -38,7 +37,6 @@ public class BuildCraft {
                             .withTabsBefore(CreativeModeTabs.COMBAT)
                             .icon(() -> ModItems.QUARRY_CONTROLLER_ITEM.get().getDefaultInstance())
                             .displayItems((params, out) -> {
-                                // Always-visible items in the BuildCraft tab
                                 out.accept(ModItems.QUARRY_CONTROLLER_ITEM.get());
 
                                 // Pipes
@@ -51,7 +49,7 @@ public class BuildCraft {
 
                                 // Engines
                                 out.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE.get());
-                                out.accept(ModItems.MODEL_ITEM_STEAM_ENGINE.get());
+                                out.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE.get());
                                 out.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE.get());
 
                                 // Gears
@@ -65,7 +63,7 @@ public class BuildCraft {
             );
 
     public BuildCraft(IEventBus modEventBus, ModContainer modContainer) {
-        // lifecycle
+        // lifecycle listeners
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
 
@@ -74,25 +72,24 @@ public class BuildCraft {
         ModItems.ITEMS.register(modEventBus);
         ModBlockEntity.BLOCK_ENTITIES.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
+        ModMenus.MENUS.register(modEventBus);        // ← NEW (menus)
         CREATIVE_MODE_TABS.register(modEventBus);
 
         // config
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        // forge/neo bus listeners
-        NeoForge.EVENT_BUS.register(this);
+        // game (NeoForge) event bus — register handlers explicitly
+        NeoForge.EVENT_BUS.addListener(this::onServerStarting);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("BuildCraft common setup ready");
     }
 
-    /** Also surface content in vanilla tabs so it’s easy to find. */
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(ModItems.QUARRY_CONTROLLER_ITEM);
 
-            // Pipes (vanilla Building Blocks tab)
             event.accept(ModItems.STONE_PIPE_ITEM);
             event.accept(ModItems.COBBLE_PIPE_ITEM);
             event.accept(ModItems.WOOD_PIPE_ITEM);
@@ -100,12 +97,10 @@ public class BuildCraft {
             event.accept(ModItems.GOLD_PIPE_ITEM);
             event.accept(ModItems.DIAMOND_PIPE_ITEM);
 
-            // Engines that are also "placeable blocks"
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
-            event.accept(ModItems.MODEL_ITEM_STEAM_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);
             event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
 
-            // Gears
             event.accept(ModItems.GEAR_WOOD);
             event.accept(ModItems.GEAR_STONE);
             event.accept(ModItems.GEAR_IRON);
@@ -113,16 +108,15 @@ public class BuildCraft {
             event.accept(ModItems.GEAR_DIAMOND);
         }
 
-        // Engines make sense in Redstone tab too
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
-            event.accept(ModItems.MODEL_ITEM_STEAM_ENGINE);
+            event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);
             event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
         }
     }
 
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
+    // No @SubscribeEvent needed when using addListener
+    private void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("BuildCraft server starting");
     }
 }

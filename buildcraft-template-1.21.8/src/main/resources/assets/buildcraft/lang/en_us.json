@@ -7,7 +7,7 @@
 
   "block.buildcraft.cobble_pipe": "Cobblestone Pipe",
   "item.buildcraft.cobble_pipe": "Cobblestone Pipe",
-
+  "screen.buildcraft.stirling_engine": "Stirling Engine",
 
   "itemGroup.buildcraft": "BuildCraft"
 }

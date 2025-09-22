@@ -1,4 +1,6 @@
 {
-  "parent": "item/generated",
-  "textures": { "layer0": "buildcraft:block/pipetextures/cobble_pipe_texture" }
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "buildcraft:block/pipetextures/cobble_pipe_texture"
+  }
 }

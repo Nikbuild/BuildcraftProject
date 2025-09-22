@@ -1,0 +1,40 @@
+{
+  "textures": {
+    "base_side": "buildcraft:block/engines/stirling_engine/side",
+    "base_back": "buildcraft:block/engines/stirling_engine/back",
+    "trunk":     "buildcraft:block/engines/stirling_engine/trunk_blue",
+    "particle":  "buildcraft:block/engines/stirling_engine/side"
+  },
+  "elements": [
+    { "from":[0,0,0], "to":[16,2,16],
+      "faces":{
+        "down":{"texture":"#base_back"},
+        "up":{"texture":"#base_side","uv":[0,0,16,8]},
+        "north":{"texture":"#base_side","uv":[0,0,16,8]},
+        "south":{"texture":"#base_side","uv":[0,0,16,8]},
+        "west":{"texture":"#base_side","uv":[0,0,16,8]},
+        "east":{"texture":"#base_side","uv":[0,0,16,8]}
+      }
+    },
+    { "from":[0,2,0], "to":[16,4,16],
+      "faces":{
+        "down":{"texture":"#base_side","uv":[0,0,16,8]},
+        "up":{"texture":"#base_back"},
+        "north":{"texture":"#base_side","uv":[0,0,16,8]},
+        "south":{"texture":"#base_side","uv":[0,0,16,8]},
+        "west":{"texture":"#base_side","uv":[0,0,16,8]},
+        "east":{"texture":"#base_side","uv":[0,0,16,8]}
+      }
+    },
+    { "from":[4,8,4], "to":[12,16,12],
+      "faces":{
+        "down":{"texture":"#trunk","uv":[0,0,8,8]},
+        "up":{"texture":"#trunk","uv":[0,0,8,8]},
+        "north":{"texture":"#trunk","uv":[8,0,16,12]},
+        "south":{"texture":"#trunk","uv":[8,0,16,12]},
+        "west":{"texture":"#trunk","uv":[8,0,16,12]},
+        "east":{"texture":"#trunk","uv":[8,0,16,12]}
+      }
+    }
+  ]
+}

@@ -1,1 +1,80 @@
-{ "parent": "buildcraft:block/engines/stirling/stirling_engine" }
+{
+  "parent": "minecraft:block/block",
+  "gui_light": "front",
+  "textures": {
+    "base_side": "buildcraft:block/engines/stirling_engine/side",
+    "base_back": "buildcraft:block/engines/stirling_engine/back",
+    "trunk":     "buildcraft:block/engines/stirling_engine/trunk_blue",
+    "accordion": "buildcraft:block/engines/stirling_engine/chamber_base",
+    "ring":      "buildcraft:block/engines/stirling_engine/side",
+    "particle":  "buildcraft:block/engines/stirling_engine/side"
+  },
+  "elements": [
+    { "from":[0,0,0], "to":[16,2,16],
+      "faces":{
+        "down":{"texture":"#base_back"},
+        "up":{"texture":"#base_side","uv":[0,0,16,8]},
+        "north":{"texture":"#base_side","uv":[0,0,16,8]},
+        "south":{"texture":"#base_side","uv":[0,0,16,8]},
+        "west":{"texture":"#base_side","uv":[0,0,16,8]},
+        "east":{"texture":"#base_side","uv":[0,0,16,8]}
+      }
+    },
+    { "from":[0,2,0], "to":[16,4,16],
+      "faces":{
+        "down":{"texture":"#base_side","uv":[0,0,16,8]},
+        "up":{"texture":"#base_back"},
+        "north":{"texture":"#base_side","uv":[0,0,16,8]},
+        "south":{"texture":"#base_side","uv":[0,0,16,8]},
+        "west":{"texture":"#base_side","uv":[0,0,16,8]},
+        "east":{"texture":"#base_side","uv":[0,0,16,8]}
+      }
+    },
+
+    { "from": [0,  7.2,  0], "to": [16, 11.2,  4],
+      "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"},
+        "north":{"texture":"#ring"}, "south":{"texture":"#ring"},
+        "west":{"texture":"#ring"}, "east":{"texture":"#ring"} } },
+    { "from": [0,  7.2, 12], "to": [16, 11.2, 16],
+      "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"},
+        "north":{"texture":"#ring"}, "south":{"texture":"#ring"},
+        "west":{"texture":"#ring"}, "east":{"texture":"#ring"} } },
+    { "from": [0,  7.2,  4], "to": [ 4, 11.2, 12],
+      "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"},
+        "north":{"texture":"#ring"}, "south":{"texture":"#ring"},
+        "west":{"texture":"#ring"}, "east":{"texture":"#ring"} } },
+    { "from": [12, 7.2,  4], "to": [16, 11.2, 12],
+      "faces": { "up":{"texture":"#ring"}, "down":{"texture":"#ring"},
+        "north":{"texture":"#ring"}, "south":{"texture":"#ring"},
+        "west":{"texture":"#ring"}, "east":{"texture":"#ring"} } },
+
+    { "from":[ 2.90, 4.00,  2.90], "to":[13.10, 7.20,  3.38],
+      "faces":{ "north":{"texture":"#accordion"}, "south":{"texture":"#accordion"} } },
+    { "from":[ 2.90, 4.00, 12.62], "to":[13.10, 7.20, 13.10],
+      "faces":{ "north":{"texture":"#accordion"}, "south":{"texture":"#accordion"} } },
+    { "from":[ 2.90, 4.00,  2.90], "to":[ 3.38, 7.20, 13.10],
+      "faces":{ "west":{"texture":"#accordion"},  "east":{"texture":"#accordion"} } },
+    { "from":[12.62, 4.00,  2.90], "to":[13.10, 7.20, 13.10],
+      "faces":{ "west":{"texture":"#accordion"},  "east":{"texture":"#accordion"} } },
+
+    { "from":[4,8,4], "to":[12,16,12],
+      "faces":{
+        "down":{"texture":"#trunk","uv":[0,0,8,8]},
+        "up":{"texture":"#trunk","uv":[0,0,8,8]},
+        "north":{"texture":"#trunk","uv":[8,0,16,12]},
+        "south":{"texture":"#trunk","uv":[8,0,16,12]},
+        "west":{"texture":"#trunk","uv":[8,0,16,12]},
+        "east":{"texture":"#trunk","uv":[8,0,16,12]}
+      }
+    }
+  ],
+  "display": {
+    "gui": { "rotation": [30, 225, 0], "translation": [0, 1, 0], "scale": [0.68, 0.68, 0.68] },
+    "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.26, 1.26, 1.26] },
+    "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.70, 0.70, 0.70] },
+    "firstperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.40, 1.40, 1.40] },
+    "firstperson_lefthand":  { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.40, 1.40, 1.40] },
+    "thirdperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 2.5, 0], "scale": [0.77, 0.77, 0.77] },
+    "thirdperson_lefthand":  { "rotation": [0, 0, 0], "translation": [0, 2.5, 0], "scale": [0.77, 0.77, 0.77] }
+  }
+}

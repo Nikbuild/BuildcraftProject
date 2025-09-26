@@ -3,20 +3,31 @@
   "ambientocclusion": false,
   "render_type": "minecraft:cutout_mipped",
   "textures": {
-    "all": "buildcraft:block/pipetextures/items_diamond_down",
+    "cap": "buildcraft:block/pipetextures/items_diamond_down",
+    "panel": "buildcraft:block/pipetextures/items_diamond_down",
     "particle": "buildcraft:block/pipetextures/diamond_pipe"
   },
   "elements": [
     {
+      "name": "colored_cap_down",
       "from": [4, 0, 4],
       "to":   [12, 4, 12],
       "faces": {
-        "north": { "texture": "#all" },
-        "south": { "texture": "#all" },
-        "west":  { "texture": "#all" },
-        "east":  { "texture": "#all" },
-        "up":    { "texture": "#all" },
-        "down":  { "texture": "#all" }
+        "north": { "texture": "#cap" },
+        "south": { "texture": "#cap" },
+        "west":  { "texture": "#cap" },
+        "east":  { "texture": "#cap" },
+        "up":    { "texture": "#cap" },
+        "down":  { "texture": "#cap" }
+      }
+    },
+    {
+      "name": "inner_outer_panel_down",
+      "from": [4, 3.99, 4],
+      "to":   [12, 4.01, 12],
+      "faces": {
+        "up":   { "texture": "#panel" },
+        "down": { "texture": "#panel" }
       }
     }
   ]

@@ -1,3 +1,4 @@
+// src/main/java/com/nick/buildcraft/registry/ModBlockEntity.java
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
@@ -7,6 +8,8 @@ import com.nick.buildcraft.content.block.engine.EngineRingMovingBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineType;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlockEntity;
+import com.nick.buildcraft.content.block.pipe.DiamondPipeBlock;
+import com.nick.buildcraft.content.block.pipe.DiamondPipeBlockEntity;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
 import net.minecraft.core.registries.Registries;
@@ -30,10 +33,20 @@ public final class ModBlockEntity {
                             Set.of(ModBlocks.QUARRY_CONTROLLER.get()))
             );
 
+    /**
+     * Single BE type for all pipes. Factory branches by block to return the correct subclass.
+     * - Diamond pipe -> DiamondPipeBlockEntity
+     * - Others       -> StonePipeBlockEntity
+     */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StonePipeBlockEntity>> STONE_PIPE =
             BLOCK_ENTITY_TYPES.register("stone_pipe",
                     () -> new BlockEntityType<>(
-                            StonePipeBlockEntity::new,
+                            (pos, state) -> {
+                                if (state.getBlock() instanceof DiamondPipeBlock) {
+                                    return new DiamondPipeBlockEntity(pos, state);
+                                }
+                                return new StonePipeBlockEntity(pos, state);
+                            },
                             Set.of(
                                     ModBlocks.STONE_PIPE.get(),
                                     ModBlocks.COBBLE_PIPE.get(),

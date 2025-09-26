@@ -1,4 +1,23 @@
 {
-  "parent": "buildcraft:block/pipes/_template/pipe_arm_north",
-  "textures": { "pipe": "buildcraft:block/pipetextures/wood_pipe_texture" }
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout_mipped",
+  "textures": {
+    "all": "buildcraft:block/pipetextures/wood_clear_pipe",
+    "particle": "buildcraft:block/pipetextures/wood_clear_pipe"
+  },
+  "elements": [
+    {
+      "from": [4, 4, 0],
+      "to":   [12, 12, 4],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west":  { "texture": "#all" },
+        "east":  { "texture": "#all" },
+        "up":    { "texture": "#all" },
+        "down":  { "texture": "#all" }
+      }
+    }
+  ]
 }

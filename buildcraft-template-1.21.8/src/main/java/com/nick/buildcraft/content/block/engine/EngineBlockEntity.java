@@ -1,11 +1,15 @@
+// src/main/java/com/nick/buildcraft/content/block/engine/EngineBlockEntity.java
 package com.nick.buildcraft.content.block.engine;
 
+import com.nick.buildcraft.api.engine.EnginePulseAcceptorApi;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.PushReaction;
@@ -16,25 +20,28 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Shared engine BE; variants are driven by {@link EngineType}. */
 public class EngineBlockEntity extends BaseEngineBlockEntity {
-
     private static final double PUSH_EPSILON = 1.0E-5;
+    private static final int FE_PER_PULSE = 80;
 
-    protected final EngineType type;     // <- protected for subclasses
+    private static final int PERIOD_REDSTONE   = 40;
+    private static final int PERIOD_STIRLING   = 20;
+    private static final int PERIOD_COMBUSTION = 10;
 
-    private float  progress  = 0.0f; // [0..1]
-    private float  progressO = 0.0f; // [0..1]
+    protected final EngineType type;
 
-    /** Profile state: when true, next powered tick will “bang” to 1.0. */
-    private boolean armed = true;
+    private float progress  = 0.0f;
+    private float progressO = 0.0f;
+
+    private int  pumpTick     = 0;
+    private int  cachedPeriod = 20;
+    private boolean wasPowered = false;
 
     public EngineBlockEntity(EngineType type, BlockPos pos, BlockState state) {
         super(ModBlockEntity.ENGINE.get(), pos, state);
         this.type = type;
+        this.cachedPeriod = basePeriodFor(type);
     }
-
-    /* ---------- BaseEngineBlockEntity hooks ---------- */
 
     @Override
     protected boolean isActive(BlockState state) {
@@ -50,39 +57,85 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
         return s.genCold();
     }
 
-    /* ---------- tick ---------- */
-
     public static void serverTick(Level level, BlockPos pos, BlockState state, EngineBlockEntity be) {
         BaseEngineBlockEntity.serverTick(level, pos, state, be);
         be.tick(level, pos, state);
     }
-
     public static void clientTick(Level level, BlockPos pos, BlockState state, EngineBlockEntity be) {
         be.tick(level, pos, state);
     }
 
-    /** Made protected so SteamEngineBlockEntity can reuse it. */
     protected void tick(Level level, BlockPos pos, BlockState state) {
         boolean powered = isActive(state);
+        cachedPeriod = basePeriodFor(type);
+        int period   = Math.max(4, cachedPeriod);
+
+        if (!powered) {
+            // HARD stop: clear pulse, zero progress, freeze client & server
+            if (!level.isClientSide && state.getBlock() instanceof EngineBlock eb && state.getValue(EngineBlock.PULSING)) {
+                level.setBlock(pos, state.setValue(EngineBlock.PULSING, Boolean.FALSE), Block.UPDATE_CLIENTS);
+            }
+            pumpTick = 0;
+            progress = progressO = 0f;
+            wasPowered = false;
+            setChanged();
+            return;
+        }
+
+        if (!wasPowered) {
+            pumpTick = 0;
+            progress = progressO = 0f;
+            wasPowered = true;
+        }
+
         progressO = progress;
 
-        boolean[] flag = new boolean[]{ this.armed };
-        float next = type.spec.stroke().next(
-                progress, powered,
-                type.spec.extendStep(), type.spec.retractStep(),
-                flag
-        );
-        this.armed = flag[0];
+        pumpTick++;
+        if (pumpTick > period) pumpTick = 1;
 
-        // Server-side entity push (swept collision like pistons)
-        double offPrev = offset(progress), offNow = offset(next);
-        if (!level.isClientSide && offPrev != offNow) pushLikePiston(level, pos, offPrev, offNow);
+        int half = period / 2;
+        float stroke = (pumpTick <= half)
+                ? (pumpTick / (float)Math.max(1, half))
+                : (1f - ((pumpTick - half) / (float)Math.max(1, period - half)));
+        setProgress(level, pos, stroke);
 
-        progress = next;
+        if (!level.isClientSide && pumpTick == half) {
+            firePumpPulse(level, pos, state);
+        }
+
         setChanged();
     }
 
-    /* ---------- sweeping push (vertical only) ---------- */
+    private void setProgress(Level level, BlockPos pos, float next) {
+        double offPrev = offset(progress);
+        double offNow  = offset(next);
+        if (!level.isClientSide && offPrev != offNow) {
+            pushLikePiston(level, pos, offPrev, offNow);
+        }
+        progress = next;
+    }
+
+    private void firePumpPulse(Level level, BlockPos pos, BlockState state) {
+        if (state.getBlock() instanceof EngineBlock eb) {
+            level.setBlock(pos, state.setValue(EngineBlock.PULSING, Boolean.TRUE), Block.UPDATE_CLIENTS);
+            if (!level.isClientSide) {
+                ((net.minecraft.server.level.ServerLevel) level).scheduleTick(pos, state.getBlock(), 2);
+            }
+        }
+
+        Direction facing = state.getValue(EngineBlock.FACING);
+        BlockPos neighborPos = pos.relative(facing);
+        Direction from = facing.getOpposite();
+
+        var be = level.getBlockEntity(neighborPos);
+        if (be instanceof EnginePulseAcceptorApi acceptor) {
+            acceptor.acceptEnginePulse(from);
+        }
+
+        var sink = net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage.BLOCK;
+        var ie = level.getCapability(sink, neighborPos, from);
+        if (ie != null) ie.receiveEnergy(FE_PER_PULSE, false);
+    }
 
     private double offset(float prog) { return RingShapes.MAX_TRAVEL_BLOCKS * prog; }
 
@@ -94,7 +147,6 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
         VoxelShape start = type.spec.ring().plateAt(offPrev);
         VoxelShape end   = type.spec.ring().plateAt(offNow);
 
-        // Sweep bounds
         AABB a0 = start.bounds(), a1 = end.bounds();
         AABB sweep = new AABB(
                 Math.min(a0.minX, a1.minX), Math.min(a0.minY, a1.minY), Math.min(a0.minZ, a1.minZ),
@@ -104,7 +156,6 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
         List<Entity> candidates = level.getEntities(null, sweep);
         if (candidates.isEmpty()) return;
 
-        // Per-part swept AABBs (Y only)
         List<AABB> partsStart = start.toAabbs();
         List<AABB> partsEnd   = end.toAabbs();
         List<AABB> sweptParts = new ArrayList<>(partsStart.size());
@@ -139,8 +190,15 @@ public class EngineBlockEntity extends BaseEngineBlockEntity {
         }
     }
 
-    /* ----- helpers for the block ----- */
     public float  getRenderOffset(float partialTicks) { return (float)(Mth.lerp(partialTicks, progressO, progress) * RingShapes.MAX_TRAVEL_BLOCKS); }
     public double getCollisionOffset() { return offset(progress); }
     public boolean isMovingUpForCollision() { return progress > progressO && progress < 1.0f; }
+
+    private static int basePeriodFor(EngineType type) {
+        return switch (type) {
+            case REDSTONE   -> PERIOD_REDSTONE;
+            case STIRLING   -> PERIOD_STIRLING;
+            case COMBUSTION -> PERIOD_COMBUSTION;
+        };
+    }
 }

@@ -1,11 +1,19 @@
 {
   "multipart": [
-    { "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_core" } },
-    { "when": { "up": true },    "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_up" } },
-    { "when": { "down": true },  "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_down" } },
-    { "when": { "north": true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_north" } },
-    { "when": { "south": true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_south" } },
-    { "when": { "west": true },  "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_west" } },
-    { "when": { "east": true },  "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_east" } }
+    { "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_core" }},
+
+    { "when": { "north": true, "north_src": false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_north" }},
+    { "when": { "south": true, "south_src": false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_south" }},
+    { "when": { "east":  true, "east_src":  false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_east"  }},
+    { "when": { "west":  true, "west_src":  false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_west"  }},
+    { "when": { "up":    true, "up_src":    false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_up"    }},
+    { "when": { "down":  true, "down_src":  false }, "apply": { "model": "buildcraft:block/pipes/wood/wood_pipe_arm_down"  }},
+
+    { "when": { "north": true, "north_src": true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_north" }},
+    { "when": { "south": true, "south_src": true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_south" }},
+    { "when": { "east":  true, "east_src":  true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_east"  }},
+    { "when": { "west":  true, "west_src":  true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_west"  }},
+    { "when": { "up":    true, "up_src":    true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_up"    }},
+    { "when": { "down":  true, "down_src":  true }, "apply": { "model": "buildcraft:block/pipes/wood/wood_solid_pipe_arm_down"  }}
   ]
 }

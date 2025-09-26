@@ -62,19 +62,15 @@ public class StirlingEngineBlock extends EngineBlock {
 
     @Nullable @Override
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
-        final Level level = ctx.getLevel();
-        final BlockPos pos = ctx.getClickedPos();
-
-        Direction snap = findAcceptor(level, pos);
-        Direction facing = (snap != null) ? snap : facingFromHit(ctx);
-
-        return this.defaultBlockState()
-                .setValue(BlockStateProperties.POWERED, level.hasNeighborSignal(pos))
-                .setValue(FACING, facing)
+        // Use EngineBlock's snap logic; then set Stirling-specific defaults.
+        BlockState base = super.getStateForPlacement(ctx);
+        if (base == null) return null;
+        return base
                 .setValue(PART, Part.BASE)
                 .setValue(BlockStateProperties.LIT, Boolean.FALSE);
     }
 
+    // (Kept for parity; not used by placement now)
     @Nullable
     private static Direction findAcceptor(Level level, BlockPos pos) {
         for (Direction d : Direction.values()) {

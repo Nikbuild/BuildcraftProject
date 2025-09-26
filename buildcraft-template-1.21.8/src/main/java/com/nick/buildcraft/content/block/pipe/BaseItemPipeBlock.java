@@ -1,3 +1,4 @@
+// src/main/java/com/nick/buildcraft/content/block/pipe/BaseItemPipeBlock.java
 package com.nick.buildcraft.content.block.pipe;
 
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
@@ -19,8 +20,9 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -29,7 +31,10 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 
 /**
  * Shared item-transport pipe block for all variants.
- * Holds the 6-way connection state + shapes, and connection policy via PipeFamily.
+ * - 6-way connections stored in the blockstate
+ * - default connection policy (family-specific tweaks in subclasses)
+ * - hides faces between connected neighbor pipes
+ * - hosts {@link StonePipeBlockEntity} (shared BE for all item pipes)
  */
 public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
 
@@ -45,7 +50,7 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
     public static final BooleanProperty UP    = BlockStateProperties.UP;
     public static final BooleanProperty DOWN  = BlockStateProperties.DOWN;
 
-    // shapes (8px arms + 8px core)  ← was 4px
+    // Shapes (8px arms + 8px core)
     private static final VoxelShape CORE  = Block.box(4, 4, 4, 12, 12, 12);
     private static final VoxelShape ARM_N = Block.box(4, 4, 0, 12, 12, 4);
     private static final VoxelShape ARM_S = Block.box(4, 4, 12, 12, 12, 16);
@@ -53,12 +58,6 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
     private static final VoxelShape ARM_E = Block.box(12, 4, 4, 16, 12, 12);
     private static final VoxelShape ARM_U = Block.box(4, 12, 4, 12, 16, 12);
     private static final VoxelShape ARM_D = Block.box(4, 0, 4, 12, 4, 12);
-
-    @Override
-    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return getShape(state, level, pos, ctx);
-    }
-
 
     protected BaseItemPipeBlock(PipeFamily family, BlockBehaviour.Properties props) {
         super(props);
@@ -71,7 +70,7 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
 
     public PipeFamily family() { return family; }
 
-    /* ---------- state + shapes ---------- */
+    /* ---------------- state + shapes ---------------- */
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -89,7 +88,12 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
         if (state.getValue(EAST))  shape = Shapes.or(shape, ARM_E);
         if (state.getValue(UP))    shape = Shapes.or(shape, ARM_U);
         if (state.getValue(DOWN))  shape = Shapes.or(shape, ARM_D);
-        return shape;
+        return shape.optimize();
+    }
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        return getShape(state, level, pos, ctx);
     }
 
     @Nullable
@@ -121,7 +125,7 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
         if (level instanceof Level lvl && !lvl.isClientSide) {
             BlockEntity be = lvl.getBlockEntity(pos);
             if (be instanceof StonePipeBlockEntity pipe) {
-                pipe.onNeighborGraphChanged(neighborPos); // instant cut/hide
+                pipe.onNeighborGraphChanged(neighborPos); // instant cut/hide for the traveling item
             }
         }
         return state.setValue(prop(dir), canConnect(level, pos, dir));
@@ -130,14 +134,14 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
     private static BooleanProperty prop(Direction d) {
         return switch (d) {
             case NORTH -> NORTH; case SOUTH -> SOUTH; case EAST -> EAST;
-            case WEST -> WEST;   case UP -> UP;       case DOWN -> DOWN;
+            case WEST  -> WEST;  case UP    -> UP;    case DOWN -> DOWN;
         };
     }
 
-    /* ---------- NEW: hide faces toward connected neighbor pipes ---------- */
+    /* ---------- hide faces toward connected neighbor pipes ---------- */
 
     @Override
-    public boolean skipRendering(BlockState self, BlockState other, Direction dir) {
+    protected boolean skipRendering(BlockState self, BlockState other, Direction dir) {
         if (other.getBlock() instanceof BaseItemPipeBlock) {
             BooleanProperty p = prop(dir);
             if (self.hasProperty(p) && self.getValue(p)) return true;
@@ -145,13 +149,14 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
         return super.skipRendering(self, other, dir);
     }
 
-    /* ---------- connectivity policy ---------- */
+    /* ---------------- connectivity policy ---------------- */
 
     /**
      * Default rule set:
      *  - Connect to other BaseItemPipeBlocks unless it's the classic Stone<->Cobble mismatch
      *  - Connect to Quarry controller block entity
      *  - Connect to any neighbor exposing ItemHandler from that side
+     * Subclasses (e.g. Wood) can further restrict via {@link #canMateWith(BaseItemPipeBlock)}.
      */
     protected boolean canConnect(LevelReader level, BlockPos pos, Direction dir) {
         BlockPos np = pos.relative(dir);
@@ -183,7 +188,7 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
         return !stoneCobbleMismatch;
     }
 
-    /* ---------- BE + tick ---------- */
+    /* ---------------- BE + ticker ---------------- */
 
     @Nullable
     @Override
@@ -198,6 +203,4 @@ public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
                 ? (lvl, p, s, be) -> ((StonePipeBlockEntity) be).tick()
                 : null;
     }
-
-    /* ---------- extra nudges (belt + suspenders) ---------- */
 }

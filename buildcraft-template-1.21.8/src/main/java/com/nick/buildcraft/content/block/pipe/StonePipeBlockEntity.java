@@ -1,6 +1,8 @@
+// src/main/java/com/nick/buildcraft/content/block/pipe/StonePipeBlockEntity.java
 package com.nick.buildcraft.content.block.pipe;
 
 import com.mojang.serialization.Codec;
+import com.nick.buildcraft.api.engine.EnginePulseAcceptorApi;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -14,109 +16,164 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
 /**
- * Single-item transport pipe with client animation.
- * Policy:
- *  - **Right-of-way**: always continue straight if possible.
- *  - Avoid U-turn as first hop.
- *  - If no sink exists: head to an open end; if none (pure loop), pick a farthest node and eject.
- *  - Hop TTL to avoid infinite oscillation.
+ * Item transport pipe with ghosting trips.
+ *
+ * Diamond hard-edge rule (server-only, no renderer special cases):
+ *   If the neighbor is a Diamond pipe and {@link DiamondPipeBlockEntity#rejectsFrom} returns true
+ *   for the entering face, we DO NOT cross the border and DO NOT transfer ownership. We simply
+ *   reverse direction INSIDE the current pipe and head back to center.
+ *
+ * Iron rule:
+ *   Items may not ENTER from the iron’s configured output face. Iron accepts to core, then
+ *   immediately sends back out the same face (classic BC).
  */
-public class StonePipeBlockEntity extends BlockEntity {
+public class StonePipeBlockEntity extends BlockEntity implements EnginePulseAcceptorApi {
 
     /* ---------------- tuning ---------------- */
-    private static final int   SLOTS_PER_PIPE = 24;
-    private static final int   TICKS_PER_SLOT = 1;
-    private static final int   HANDOFF_RETRY_TICKS = 10;
-    private static final int   CUT_HIDE_TICKS = 2;
-    private static final int   OPEN_END_BFS_LIMIT = 1024;
-    private static final int   HOP_TTL_MAX = 256;
+    private static final int   SLOTS_PER_PIPE      = 24;
+    private static final int   TICKS_PER_SLOT      = 1;
+    private static final int   CUT_HIDE_TICKS      = 2;
+    private static final int   OPEN_END_BFS_LIMIT  = 1024;
+    private static final int   HOP_TTL_MAX         = 256;
+    private static final int   MAX_TRIPS_PER_PIPE  = 32;
 
-    /* ------------- state (trip) ------------- */
-    private ItemStack cargo = ItemStack.EMPTY;
+    // --- speed model (BC-like) ---
+    private static final float NORMAL_SPEED = 0.10f;
+    private static final float GOLD_TARGET  = 0.30f;
+    private static final float GOLD_DELTA   = 0.10f;
+    private static final float SPEED_DECAY  = 0.002f;
 
-    private final List<BlockPos> route = new ArrayList<>();
-    private int routeIndex = 0;
+    // handoff scratch (carry velocity across pipes)
+    private static float  HANDOFF_VEL      = NORMAL_SPEED;
+    private static boolean HANDOFF_HAS_VEL = false;
 
-    private BlockPos sinkPos = null;
-    private Direction sinkFace = null;
+    /* ------------- one "trip" (one stack moving through) ------------- */
+    private static final class Trip {
+        ItemStack cargo = ItemStack.EMPTY;
 
-    private float segmentProgress = 0f;
+        final List<BlockPos> route = new ArrayList<>();
+        int routeIndex = 0;
 
-    private Direction receivedFrom = null; // neighbor we got the item from
-    private boolean sourceForTrip = false;
+        BlockPos sinkPos = null;
+        Direction sinkFace = null;
 
-    private int slotIndex = 0;
-    private int slotTick  = 0;
+        float segmentProgress = 0f;           // 0..1 along (center->face) of the *current* segment
+        Direction receivedFrom = null;        // neighbor we got the item from (opposite of default forward)
+        boolean sourceForTrip = false;
 
-    private int handoffBackoff = 0;
-    private int cutHideCooldown = 0;
-    private int hopTTL = HOP_TTL_MAX;
+        int slotIndex = 0;                    // 0..SLOTS_PER_PIPE
+        int slotTick  = 0;
+
+        int cutHideCooldown = 0;
+        int hopTTL = HOP_TTL_MAX;
+
+        // --- BC-like speed state ---
+        float vel = NORMAL_SPEED;             // relative units
+        float slotAccum = 0f;                 // fractional slots advanced (directionless)
+
+        // Segment direction sign: +1 = toward current 'forward' face, -1 = back toward center.
+        int dirSign = +1;
+
+        // If non-null, use this as the next outgoing dir once (when rebuilding route), then clear it.
+        @Nullable Direction forcedOutOrNull = null;
+    }
+
+    /* ---------------- state ---------------- */
+    private final List<Trip> trips = new ArrayList<>();
+
+    /** Coalesce multiple pulses from the SAME side in the same tick. */
+    private final EnumMap<Direction, Long> lastPulseTickBySide = new EnumMap<>(Direction.class);
 
     public StonePipeBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntity.STONE_PIPE.get(), pos, state);
+        for (Direction d : Direction.values()) lastPulseTickBySide.put(d, Long.MIN_VALUE);
     }
 
+    /* ---------------- public API: offer into the pipe ---------------- */
 
-    /* -------------- API: offer -------------- */
+    /** For inventory->pipe insertion when this pipe is a Diamond. */
+    boolean shouldRejectAtBorder(Direction from, ItemStack stack) {
+        if (this instanceof DiamondPipeBlockEntity dp) {
+            return dp.rejectsFrom(from, stack);
+        }
+        return false;
+    }
+
+    /** Injects a stack into this pipe from side {@code from}. Always ghosts through existing trips. */
     public ItemStack offer(ItemStack stack, Direction from) {
-        if (level == null || level.isClientSide || stack.isEmpty() || hasTrip()) return stack;
+        if (level == null || level.isClientSide || stack.isEmpty()) return stack;
+        if (trips.size() >= MAX_TRIPS_PER_PIPE) return stack;
 
+        // Diamond edge-reject for inventory -> pipe insert
+        if (shouldRejectAtBorder(from, stack)) {
+            return stack; // refuse before entering the core
+        }
+
+        BlockState here = getBlockState();
+        boolean ironBounce = here != null && here.getBlock() instanceof IronPipeBlock
+                && !IronPipeBlock.canItemEnterFrom(here, from);
+
+        Trip t = new Trip();
         int canAccept = Math.min(stack.getCount(), stack.getMaxStackSize());
-        if (canAccept <= 0) return stack;
-
-        cargo = stack.copy();
-        cargo.setCount(canAccept);
+        t.cargo = stack.copy();
+        t.cargo.setCount(canAccept);
 
         ItemStack leftover = stack.copy();
         leftover.shrink(canAccept);
 
-        receivedFrom = from;
-        sourceForTrip = true;
+        t.receivedFrom = from;
+        t.sourceForTrip = true;
+        t.dirSign = +1;
 
-        rebuildRoute();
+        if (ironBounce) t.forcedOutOrNull = from; // enter core, then immediately head back
 
-        slotIndex = slotTick = 0;
-        segmentProgress = 0f;
-        handoffBackoff = 0;
-        cutHideCooldown = 0;
-        hopTTL = HOP_TTL_MAX;
+        rebuildRouteConsume(t);
 
+        trips.add(t);
         setChanged();
         requestSyncNow();
         return leftover;
     }
 
-    private boolean hasTrip() { return !cargo.isEmpty(); }
-
     /* ------- neighbor graph immediate cut ---- */
     public void onNeighborGraphChanged(BlockPos fromPos) {
-        if (level == null || level.isClientSide || !hasTrip()) return;
+        if (level == null || level.isClientSide || trips.isEmpty()) return;
 
-        boolean affects = (routeIndex < route.size() && route.get(routeIndex).equals(fromPos));
-        if (!affects) {
-            Direction out = getOutgoingDirOrNull();
-            if (out != null && worldPosition.relative(out).equals(fromPos)) affects = true;
+        boolean any = false;
+        for (Trip t : trips) {
+            boolean affects = (t.routeIndex < t.route.size() && t.route.get(t.routeIndex).equals(fromPos));
+            if (!affects) {
+                Direction out = peekOutgoingDir(t); // <-- do NOT consume
+                if (out != null && worldPosition.relative(out).equals(fromPos)) affects = true;
+            }
+            if (affects) {
+                t.route.clear();
+                t.routeIndex = 0;
+                t.sinkPos = null;
+                t.sinkFace = null;
+
+                t.slotIndex = Math.min(t.slotIndex, SLOTS_PER_PIPE - 1);
+                t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                t.cutHideCooldown = CUT_HIDE_TICKS;
+
+                // Rebuild a fresh route immediately so the trip keeps moving
+                rebuildRouteConsume(t);
+                // Optional: give a small TTL grace after topology changes
+                // t.hopTTL = HOP_TTL_MAX;
+
+                any = true;
+            }
+
         }
-
-        if (affects) {
-            route.clear();
-            routeIndex = 0;
-            sinkPos = null;
-            sinkFace = null;
-
-            slotIndex = Math.min(slotIndex, SLOTS_PER_PIPE - 1);
-            segmentProgress = slotIndex / (float) SLOTS_PER_PIPE;
-            cutHideCooldown = CUT_HIDE_TICKS;
-
-            requestSyncNow();
-        }
+        if (any) requestSyncNow();
     }
 
-    /* -------------------- tick -------------------- */
+    /* -------------------- ticking -------------------- */
     @Override
     public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener> getUpdatePacket() {
         return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
@@ -128,86 +185,198 @@ public class StonePipeBlockEntity extends BlockEntity {
 
     /** Call from block ticker (server). */
     public void tick() {
-        if (level == null || level.isClientSide || !hasTrip()) return;
+        if (level == null || level.isClientSide || trips.isEmpty()) return;
 
-        if (cutHideCooldown > 0) cutHideCooldown--;
+        boolean changed = false;
 
-        validateNextHopAndMaybeReroute();
+        for (Iterator<Trip> it = trips.iterator(); it.hasNext(); ) {
+            Trip t = it.next();
 
-        if (++slotTick < TICKS_PER_SLOT) return;
-        slotTick = 0;
+            if (t.cutHideCooldown > 0) t.cutHideCooldown--;
 
-        if (++slotIndex <= SLOTS_PER_PIPE) {
-            segmentProgress = slotIndex / (float) SLOTS_PER_PIPE;
+            validateNextHopAndMaybeReroute(t);
+
+            // timing
+            if (++t.slotTick < TICKS_PER_SLOT) continue;
+            t.slotTick = 0;
+
+            // --- BuildCraft-like acceleration model ---
+            if (isGoldHere()) {
+                t.vel = Math.min(GOLD_TARGET, t.vel + GOLD_DELTA);
+            } else {
+                t.vel = Math.max(NORMAL_SPEED, t.vel - SPEED_DECAY);
+            }
+
+            t.slotAccum += (t.vel / NORMAL_SPEED);
+
+            int whole = (int) t.slotAccum;
+            if (whole <= 0) {
+                t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                changed = true;
+                continue;
+            }
+            t.slotAccum -= whole;
+
+            // direction-aware motion
+            int delta = whole * t.dirSign;
+            int nextIndex = t.slotIndex + delta;
+
+            // ----- moving back toward center? -----
+            if (t.dirSign < 0) {
+                if (nextIndex > 0) {
+                    t.slotIndex = nextIndex;
+                    t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                    changed = true;
+                    continue;
+                }
+                // reached/overshot center → flip, rebuild to go back out the way we came
+                t.slotIndex = 0;
+                t.segmentProgress = 0f;
+                t.dirSign = +1;
+                t.slotAccum = 0f;
+                t.forcedOutOrNull = t.receivedFrom; // next forward segment is the side we came from
+                rebuildRouteConsume(t);
+                changed = true;
+                continue;
+            }
+
+            // ----- normal forward motion -----
+            if (nextIndex < SLOTS_PER_PIPE) {
+                t.slotIndex = nextIndex;
+                t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                changed = true;
+                continue;
+            }
+
+            // would cross the border: check neighbor first
+            if (t.routeIndex < t.route.size()) {
+                BlockPos nextPipePos = t.route.get(t.routeIndex);
+
+                if (!isValidPipeAt(nextPipePos)) {
+                    rebuildRouteConsume(t);
+                    changed = true;
+                    continue;
+                }
+
+                BlockEntity be = level.getBlockEntity(nextPipePos);
+                if (be instanceof StonePipeBlockEntity next) {
+                    Direction enteringFace = next.directionFrom(worldPosition); // how 'next' sees us
+
+                    // DIAMOND HARD WALL: reject at border -> reverse INSIDE this pipe (no transfer)
+                    if (be instanceof DiamondPipeBlockEntity dp &&
+                            enteringFace != null &&
+                            dp.rejectsFrom(enteringFace, t.cargo)) {
+
+                        t.dirSign = -1;                                  // head back toward center
+                        t.slotIndex = Math.min(SLOTS_PER_PIPE - 1, t.slotIndex);
+                        t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                        t.slotAccum = 0f;
+                        t.cutHideCooldown = CUT_HIDE_TICKS;
+                        changed = true;
+                        continue;
+                    }
+
+                    // normal handoff (no 1.0 render)
+                    HANDOFF_VEL = t.vel;
+                    HANDOFF_HAS_VEL = true;
+
+                    boolean accepted = next.receiveFromGuide(t.cargo, worldPosition);
+                    if (accepted) {
+                        t.routeIndex++;
+                        it.remove(); // transferred ownership
+                        changed = true;
+                        continue;
+                    } else {
+                        // capacity/etc failure → reverse locally
+                        HANDOFF_HAS_VEL = false;
+                        t.dirSign = -1;
+                        t.slotIndex = Math.min(SLOTS_PER_PIPE - 1, t.slotIndex);
+                        t.segmentProgress = t.slotIndex / (float) SLOTS_PER_PIPE;
+                        t.cutHideCooldown = CUT_HIDE_TICKS;
+                        changed = true;
+                        continue;
+                    }
+                }
+
+                // neighbor wasn't a pipe after all → reroute
+                rebuildRouteConsume(t);
+                changed = true;
+                continue;
+            }
+
+            // no route left → try sink insert or eject to world if open end
+            if (t.sinkPos != null && t.sinkFace != null) {
+                IItemHandler dst = level.getCapability(Capabilities.ItemHandler.BLOCK, t.sinkPos, t.sinkFace);
+                if (dst != null) {
+                    ItemStack leftover = ItemHandlerHelper.insertItem(dst, t.cargo.copy(), false);
+                    if (leftover.isEmpty()) {
+                        it.remove();
+                        changed = true;
+                        continue;
+                    } else {
+                        t.cargo = leftover;
+                        changed = true;
+                        continue;
+                    }
+                }
+            }
+
+// No sink and no route → open end; eject immediately (don’t wait on TTL)
+            abortAndDrop(t);
+            it.remove();
+            changed = true;
+            continue;
+
+        }
+
+        if (changed) {
+            setChanged();
             requestSyncNow();
-            return;
         }
-
-        // segment boundary
-        slotIndex = 0;
-        segmentProgress = 0f;
-
-        if (--hopTTL <= 0) { abortAndDrop(); return; }
-
-        // route → handoff
-        if (routeIndex < route.size()) {
-            BlockPos nextPipePos = route.get(routeIndex);
-            if (!isValidPipeAt(nextPipePos)) {
-                rebuildRoute();
-                requestSyncNow();
-                return;
-            }
-
-            BlockEntity be = level.getBlockEntity(nextPipePos);
-            if (be instanceof StonePipeBlockEntity next && next.receiveFromGuide(cargo, worldPosition)) {
-                routeIndex++;
-                clearTrip();
-                handoffBackoff = 0;
-                requestSyncNow();
-                return;
-            }
-
-            if (handoffBackoff++ < HANDOFF_RETRY_TICKS) {
-                rebuildRoute();
-                requestSyncNow();
-                return;
-            }
-
-            handoffBackoff = 0;
-            abortAndDrop();
-            return;
-        }
-
-        // sink → insert
-        if (sinkPos != null && sinkFace != null) {
-            IItemHandler dst = level.getCapability(Capabilities.ItemHandler.BLOCK, sinkPos, sinkFace);
-            if (dst != null) {
-                ItemStack leftover = ItemHandlerHelper.insertItem(dst, cargo.copy(), false);
-                if (leftover.isEmpty()) { clearTrip(); requestSyncNow(); return; }
-                cargo = leftover; requestSyncNow(); return;
-            }
-        }
-
-        // otherwise eject at nozzle
-        abortAndDrop();
     }
 
+    /** Called by upstream neighbor at segment boundary to transfer a trip. */
     private boolean receiveFromGuide(ItemStack stack, BlockPos upstreamPos) {
-        if (hasTrip()) return false;
+        if (level == null || level.isClientSide) return false;
 
-        cargo = stack.copy();
-        cargo.setCount(Math.min(stack.getCount(), stack.getMaxStackSize()));
-        sourceForTrip = false;
-        receivedFrom = directionFrom(upstreamPos);
+        Direction from = directionFrom(upstreamPos);
+        BlockState here = getBlockState();
 
-        rebuildRoute();
+        // Diamond edge reject for pipe->pipe handoff (bounce at border)
+        if (shouldRejectAtBorder(from, stack)) {
+            return false; // sender must keep and bounce
+        }
 
-        slotIndex = slotTick = 0;
-        segmentProgress = 0f;
-        handoffBackoff = 0;
-        cutHideCooldown = 0;
-        hopTTL = HOP_TTL_MAX;
+        if (trips.size() >= MAX_TRIPS_PER_PIPE) {
+            // accept ownership and drop to world to avoid dupes
+            Block.popResource(level, worldPosition, stack.copy());
+            return true;
+        }
 
+        Trip t = new Trip();
+        t.vel = HANDOFF_HAS_VEL ? HANDOFF_VEL : NORMAL_SPEED;
+        HANDOFF_HAS_VEL = false;
+        t.cargo = stack.copy();
+        t.cargo.setCount(Math.min(stack.getCount(), stack.getMaxStackSize()));
+        t.sourceForTrip = false;
+        t.receivedFrom = from;
+        t.dirSign = +1;
+
+        // Iron: entry from disallowed face? accept to core, then immediately head back.
+        if (here != null && here.getBlock() instanceof IronPipeBlock) {
+            if (!IronPipeBlock.canItemEnterFrom(here, from)) {
+                t.forcedOutOrNull = from;
+            }
+        }
+
+        // spawn at start of segment
+        t.slotIndex = t.slotTick = 0;
+        t.segmentProgress = 0f;
+        t.cutHideCooldown = 0;
+        t.hopTTL = HOP_TTL_MAX;
+
+        rebuildRouteConsume(t);
+        trips.add(t);
         setChanged();
         requestSyncNow();
         return true;
@@ -218,47 +387,74 @@ public class StonePipeBlockEntity extends BlockEntity {
         return null;
     }
 
-    private void abortAndDrop() {
-        if (level != null && !cargo.isEmpty()) {
-            Direction out = getOutgoingDirOrNull();
+    private void abortAndDrop(Trip t) {
+        if (level != null && !t.cargo.isEmpty()) {
+            Direction out = peekOutgoingDir(t); // do not consume here
             BlockPos dropPos = (out != null) ? worldPosition.relative(out) : worldPosition;
-            Block.popResource(level, dropPos, cargo);
+            Block.popResource(level, dropPos, t.cargo.copy());
         }
-        clearTrip();
-        requestSyncNow();
     }
 
-    private void clearTrip() {
-        cargo = ItemStack.EMPTY;
-        sourceForTrip = false;
-        receivedFrom = null;
-        segmentProgress = 0f;
-        slotIndex = slotTick = 0;
-        route.clear();
-        routeIndex = 0;
-        sinkPos = null;
-        sinkFace = null;
-        handoffBackoff = 0;
-        cutHideCooldown = 0;
-        setChanged();
-    }
-
-    /* ---------- client hooks ---------- */
-    public ItemStack getCargoForRender() { return cargo; }
-    public float getSegmentProgress() { return segmentProgress; }
+    /* ---------- legacy single-trip hooks used by (old) renderer ---------- */
+    public ItemStack getCargoForRender() { return trips.isEmpty() ? ItemStack.EMPTY : trips.get(0).cargo; }
+    public float getSegmentProgress() { return trips.isEmpty() ? 0f : trips.get(0).segmentProgress; }
     public BlockPos getBlockPos() { return worldPosition; }
     public BlockPos getNextPipeOrNull() {
-        if (routeIndex < route.size()) {
-            BlockPos p = route.get(routeIndex);
+        if (trips.isEmpty()) return null;
+        Trip t = trips.get(0);
+        if (t.routeIndex < t.route.size()) {
+            BlockPos p = t.route.get(t.routeIndex);
             if (!isValidPipeAt(p)) return null;
             return p;
         }
         return null;
     }
-    public boolean isHeadingToSink() { return routeIndex >= route.size() && sinkPos != null; }
-    public BlockPos getSinkPos() { return sinkPos; }
-    public Direction getOutgoingDirOrNull() { return receivedFrom != null ? receivedFrom.getOpposite() : null; }
-    public boolean shouldHideForCut() { return cutHideCooldown > 0; }
+    public boolean isHeadingToSink() { return !trips.isEmpty() && trips.get(0).routeIndex >= trips.get(0).route.size() && trips.get(0).sinkPos != null; }
+    public BlockPos getSinkPos() { return trips.isEmpty() ? null : trips.get(0).sinkPos; }
+    public Direction getOutgoingDirOrNull() { return trips.isEmpty() ? null : peekOutgoingDir(trips.get(0)); }
+    public boolean shouldHideForCut() { return !trips.isEmpty() && trips.get(0).cutHideCooldown > 0; }
+
+    /* ---------- NEW: multi-trip render snapshot ---------- */
+
+    public static final class RenderTrip {
+        public final ItemStack stack;
+        public final float progress;
+        public final BlockPos nextPipeOrNull;
+        public final BlockPos sinkPosOrNull;
+        public final Direction outgoingDirOrNull;
+        public final boolean hiddenForCut;
+
+        public RenderTrip(ItemStack stack, float progress,
+                          BlockPos next, BlockPos sink, Direction out, boolean hidden) {
+            this.stack = stack;
+            this.progress = progress;
+            this.nextPipeOrNull = next;
+            this.sinkPosOrNull = sink;
+            this.outgoingDirOrNull = out;
+            this.hiddenForCut = hidden;
+        }
+    }
+
+    public java.util.List<RenderTrip> getRenderTrips(int max) {
+        java.util.ArrayList<RenderTrip> out = new java.util.ArrayList<>(Math.min(max, trips.size()));
+        for (int i = 0; i < trips.size() && out.size() < max; i++) {
+            Trip t = trips.get(i);
+            BlockPos next = null;
+            if (t.routeIndex < t.route.size()) {
+                BlockPos p = t.route.get(t.routeIndex);
+                if (isValidPipeAt(p)) next = p;
+            }
+            out.add(new RenderTrip(
+                    t.cargo,
+                    t.segmentProgress,
+                    next,
+                    t.sinkPos,
+                    peekOutgoingDir(t),          // no consume during render
+                    t.cutHideCooldown > 0
+            ));
+        }
+        return out;
+    }
 
     /* ---------- sync / save ---------- */
     private void requestSyncNow() {
@@ -268,75 +464,81 @@ public class StonePipeBlockEntity extends BlockEntity {
 
     @Override
     protected void saveAdditional(ValueOutput out) {
-        out.store("has", Codec.BOOL, hasTrip());
-        out.putInt("src", sourceForTrip ? 1 : 0);
-        out.putInt("ri", routeIndex);
-        out.store("prog", Codec.FLOAT, segmentProgress);
-        out.putInt("rf", receivedFrom == null ? -1 : receivedFrom.get3DDataValue());
+        out.putInt("tc", trips.size());
+        for (int i = 0; i < trips.size(); i++) {
+            Trip t = trips.get(i);
+            String p = "t" + i + "_";
 
-        out.putInt("slotIndex", slotIndex);
-        out.putInt("slotTick", slotTick);
-        out.putInt("handoffBackoff", handoffBackoff);
-        out.putInt("cutHide", cutHideCooldown);
-        out.putInt("ttl", hopTTL);
+            out.store(p + "cargo", ItemStack.CODEC, t.cargo);
+            out.putInt(p + "ri", t.routeIndex);
+            out.store(p + "prog", Codec.FLOAT, t.segmentProgress);
+            out.putInt(p + "rf", t.receivedFrom == null ? -1 : t.receivedFrom.get3DDataValue());
+            out.putInt(p + "src", t.sourceForTrip ? 1 : 0);
 
-        if (!cargo.isEmpty()) out.store("cargo", ItemStack.CODEC, cargo);
+            out.putInt(p + "slotIndex", t.slotIndex);
+            out.putInt(p + "slotTick", t.slotTick);
+            out.putInt(p + "cutHide", t.cutHideCooldown);
+            out.putInt(p + "ttl", t.hopTTL);
+            out.putInt(p + "dir", t.dirSign);
 
-        if (sinkPos != null) {
-            out.putInt("sx", sinkPos.getX());
-            out.putInt("sy", sinkPos.getY());
-            out.putInt("sz", sinkPos.getZ());
-            out.putInt("sf", sinkFace == null ? -1 : sinkFace.get3DDataValue());
-        }
+            if (t.sinkPos != null) {
+                out.putInt(p + "sx", t.sinkPos.getX());
+                out.putInt(p + "sy", t.sinkPos.getY());
+                out.putInt(p + "sz", t.sinkPos.getZ());
+                out.putInt(p + "sf", t.sinkFace == null ? -1 : t.sinkFace.get3DDataValue());
+            }
 
-        out.putInt("rc", route.size());
-        for (int i = 0; i < route.size(); i++) {
-            BlockPos p = route.get(i);
-            out.putInt("rx" + i, p.getX());
-            out.putInt("ry" + i, p.getY());
-            out.putInt("rz" + i, p.getZ());
+            out.putInt(p + "rc", t.route.size());
+            for (int j = 0; j < t.route.size(); j++) {
+                BlockPos bp = t.route.get(j);
+                out.putInt(p + "rx" + j, bp.getX());
+                out.putInt(p + "ry" + j, bp.getY());
+                out.putInt(p + "rz" + j, bp.getZ());
+            }
         }
     }
 
     @Override
     protected void loadAdditional(ValueInput in) {
         super.loadAdditional(in);
+        trips.clear();
 
-        boolean has = in.getInt("has").orElse(0) != 0;
-        sourceForTrip = in.getInt("src").orElse(0) != 0;
-        routeIndex = in.getInt("ri").orElse(0);
-        segmentProgress = in.read("prog", Codec.FLOAT).orElse(0f);
-        int rf = in.getInt("rf").orElse(-1);
-        receivedFrom = (rf >= 0 && rf < 6) ? Direction.from3DDataValue(rf) : null;
+        int tc = in.getInt("tc").orElse(0);
+        for (int i = 0; i < tc; i++) {
+            String p = "t" + i + "_";
 
-        slotIndex = in.getInt("slotIndex").orElse(0);
-        slotTick = in.getInt("slotTick").orElse(0);
-        handoffBackoff = in.getInt("handoffBackoff").orElse(0);
-        cutHideCooldown = in.getInt("cutHide").orElse(0);
-        hopTTL = in.getInt("ttl").orElse(HOP_TTL_MAX);
+            Trip t = new Trip();
+            t.cargo = in.read(p + "cargo", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+            t.routeIndex = in.getInt(p + "ri").orElse(0);
+            t.segmentProgress = in.read(p + "prog", Codec.FLOAT).orElse(0f);
+            int rf = in.getInt(p + "rf").orElse(-1);
+            t.receivedFrom = (rf >= 0 && rf < 6) ? Direction.from3DDataValue(rf) : null;
+            t.sourceForTrip = in.getInt(p + "src").orElse(0) != 0;
 
-        cargo = has ? in.read("cargo", ItemStack.CODEC).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
+            t.slotIndex = in.getInt(p + "slotIndex").orElse(0);
+            t.slotTick = in.getInt(p + "slotTick").orElse(0);
+            t.cutHideCooldown = in.getInt(p + "cutHide").orElse(0);
+            t.hopTTL = in.getInt(p + "ttl").orElse(HOP_TTL_MAX);
+            t.dirSign = in.getInt(p + "dir").orElse(+1);
 
-        int rc = in.getInt("rc").orElse(0);
-        route.clear();
-        for (int i = 0; i < rc; i++) {
-            int x = in.getInt("rx" + i).orElse(0);
-            int y = in.getInt("ry" + i).orElse(0);
-            int z = in.getInt("rz" + i).orElse(0);
-            route.add(new BlockPos(x, y, z));
-        }
+            Integer sx = in.getInt(p + "sx").orElse(null);
+            Integer sy = in.getInt(p + "sy").orElse(null);
+            Integer sz = in.getInt(p + "sz").orElse(null);
+            int sf = in.getInt(p + "sf").orElse(-1);
+            if (sx != null && sy != null && sz != null) {
+                t.sinkPos = new BlockPos(sx, sy, sz);
+                t.sinkFace = (sf >= 0 && sf < 6) ? Direction.from3DDataValue(sf) : null;
+            }
 
-        Integer sx = in.getInt("sx").orElse(null);
-        Integer sy = in.getInt("sy").orElse(null);
-        Integer sz = in.getInt("sz").orElse(null);
-        int sf = in.getInt("sf").orElse(-1);
+            int rc = in.getInt(p + "rc").orElse(0);
+            for (int j = 0; j < rc; j++) {
+                int x = in.getInt(p + "rx" + j).orElse(0);
+                int y = in.getInt(p + "ry" + j).orElse(0);
+                int z = in.getInt(p + "rz" + j).orElse(0);
+                t.route.add(new BlockPos(x, y, z));
+            }
 
-        if (sx != null && sy != null && sz != null) {
-            sinkPos = new BlockPos(sx, sy, sz);
-            sinkFace = (sf >= 0 && sf < 6) ? Direction.from3DDataValue(sf) : null;
-        } else {
-            sinkPos = null;
-            sinkFace = null;
+            if (!t.cargo.isEmpty()) trips.add(t);
         }
     }
 
@@ -347,60 +549,55 @@ public class StonePipeBlockEntity extends BlockEntity {
         return level.getBlockEntity(pos) instanceof StonePipeBlockEntity;
     }
 
-    /** Rebuilds route obeying RIGHT-OF-WAY (straight if possible). */
-    private void rebuildRoute() {
+    /** Rebuilds route obeying right-of-way + diamond/iron rules. (Consumes one-shot dir if present.) */
+    private void rebuildRouteConsume(Trip t) {
         if (level == null) return;
 
-        route.clear();
-        routeIndex = 0;
-        sinkPos = null;
-        sinkFace = null;
+        t.route.clear();
+        t.routeIndex = 0;
+        t.sinkPos = null;
+        t.sinkFace = null;
 
-        // 0) RIGHT-OF-WAY: continue straight if there’s a pipe ahead
-        Direction forward = getOutgoingDirOrNull();
+        Direction forward = preferredOutgoingDir(t, /*consume=*/true);
         if (forward != null) {
             BlockPos ahead = worldPosition.relative(forward);
 
-            // straight into a pipe? take that single hop and stop planning
             if (isValidPipeAt(ahead)) {
-                route.add(ahead);
+                t.route.add(ahead);
                 return;
             }
 
-            // straight into an inventory? set sink immediately
+            // straight (chosen) sink?
             IItemHandler straightHandler = getHandler(ahead, forward.getOpposite());
             if (straightHandler != null) {
-                sinkPos = ahead;
-                sinkFace = forward.getOpposite();
-                return; // no intermediate pipes
+                t.sinkPos = ahead;
+                t.sinkFace = forward.getOpposite();
+                return;
             }
         }
 
-        // 1) Prefer true sinks using global pathfinder (may turn)
-        var path = PipeTransport.findPath(level, worldPosition, receivedFrom);
+        // Pathfind (fallback) – respects diamond filters along the way
+        PipeTransport.Path path = PipeTransport.findPath((Level) level, worldPosition, t.receivedFrom, t.cargo);
         if (path != null) {
-            route.addAll(path.nodes());
-            sinkPos = path.sinkPos();
-            sinkFace = path.sinkFace();
+            t.route.addAll(path.nodes());
+            t.sinkPos = path.sinkPos();
+            t.sinkFace = path.sinkFace();
             return;
         }
 
-        // 2) No sink → head to nearest open end; if none, farthest node (loop breaker)
-        List<BlockPos> toEnd = findOpenEndRoute((Level) level, worldPosition, receivedFrom);
-        if (!toEnd.isEmpty()) {
-            route.addAll(toEnd);
-        }
-        // else: no route → eject at this pipe when segment completes
+        // No sink → head to nearest open end; if none, farthest node
+        List<BlockPos> toEnd = findOpenEndRoute((Level) level, worldPosition, t.receivedFrom);
+        if (!toEnd.isEmpty()) t.route.addAll(toEnd);
     }
 
-    private void validateNextHopAndMaybeReroute() {
-        if (routeIndex < route.size()) {
-            BlockPos next = route.get(routeIndex);
-            if (!isValidPipeAt(next)) { rebuildRoute(); requestSyncNow(); }
+    private void validateNextHopAndMaybeReroute(Trip t) {
+        if (t.routeIndex < t.route.size()) {
+            BlockPos next = t.route.get(t.routeIndex);
+            if (!isValidPipeAt(next)) { rebuildRouteConsume(t); requestSyncNow(); }
         }
     }
 
-    /** BFS to nearest terminal (excluding parent). If none, pick farthest node to break loops. */
+    /** BFS to nearest terminal (excluding parent). If none, pick farthest node. */
     private List<BlockPos> findOpenEndRoute(Level lvl, BlockPos start, Direction fromDir) {
         List<BlockPos> empty = Collections.emptyList();
         Set<BlockPos> visited = new HashSet<>();
@@ -416,7 +613,6 @@ public class StonePipeBlockEntity extends BlockEntity {
             if (dist.getOrDefault(cur, 0) > dist.getOrDefault(farthest, 0)) farthest = cur;
 
             BlockPos par = parent.get(cur);
-            int forwardCount = 0;
 
             for (Direction d : Direction.values()) {
                 BlockPos np = cur.relative(d);
@@ -424,9 +620,7 @@ public class StonePipeBlockEntity extends BlockEntity {
 
                 // avoid U-turn as first hop
                 if (cur.equals(start) && fromDir != null && np.equals(start.relative(fromDir))) continue;
-
                 if (par != null && np.equals(par)) continue;
-                forwardCount++;
 
                 if (visited.add(np)) {
                     parent.put(np, cur);
@@ -435,8 +629,18 @@ public class StonePipeBlockEntity extends BlockEntity {
                 }
             }
 
+            // terminal = dead-end pipe (no further pipes excluding parent/entry)
+            int forwardCount = 0;
+            for (Direction d : Direction.values()) {
+                BlockPos np = cur.relative(d);
+                if (!isValidPipeAt(np)) continue;
+                if (par != null && np.equals(par)) continue; // exclude parent
+                if (cur.equals(start) && fromDir != null && np.equals(start.relative(fromDir))) continue; // exclude entry dir at first hop
+                forwardCount++;
+            }
             boolean terminal = forwardCount == 0 && !cur.equals(start);
             if (terminal) return reconstructPath(start, cur, parent);
+
         }
 
         if (!farthest.equals(start)) return reconstructPath(start, farthest, parent);
@@ -451,11 +655,90 @@ public class StonePipeBlockEntity extends BlockEntity {
         return path;
     }
 
+    /**
+     * Preferred outgoing direction inside THIS pipe.
+     * If {@code consume} is true, a one-shot forced direction is consumed.
+     * If false, it is returned without clearing (for rendering/snapshotting).
+     */
+    private Direction preferredOutgoingDir(Trip t, boolean consume) {
+        BlockState s = getBlockState();
+
+        // honor a one-shot forced direction
+        if (t.forcedOutOrNull != null) {
+            Direction d = t.forcedOutOrNull;
+            if (consume) t.forcedOutOrNull = null; // consume only when routing
+            return d;
+        }
+
+        // Iron behavior
+        if (s != null && s.getBlock() instanceof IronPipeBlock) {
+            return IronPipeBlock.getOutput(s);
+        }
+
+        // Diamond behavior (choose an output face but NOT the face we came from if possible)
+        if (this instanceof DiamondPipeBlockEntity dp && t.cargo != null) {
+            EnumSet<Direction> allowed = dp.getAllowedDirections(t.cargo);
+            if (!allowed.isEmpty()) {
+                if (t.receivedFrom != null && allowed.contains(t.receivedFrom)) {
+                    return t.receivedFrom; // bounce back (classic BC feel)
+                }
+                if (t.receivedFrom != null) {
+                    for (Direction d : allowed) if (d != t.receivedFrom) return d;
+                } else {
+                    return allowed.iterator().next();
+                }
+            }
+        }
+
+        // Default: continue straight
+        return t.receivedFrom != null ? t.receivedFrom.getOpposite() : null;
+    }
+
+    private Direction peekOutgoingDir(Trip t) { return preferredOutgoingDir(t, false); } // no side effects
+
     // NeoForge helper
     private IItemHandler getHandler(BlockPos pos, Direction face) {
         if (level == null) return null;
         BlockState state = level.getBlockState(pos);
         BlockEntity be = level.getBlockEntity(pos);
         return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, state, be, face);
+    }
+
+    private boolean isGoldHere() {
+        BlockState s = getBlockState();
+        return s != null
+                && s.getBlock() instanceof BaseItemPipeBlock p
+                && p.family() == BaseItemPipeBlock.PipeFamily.GOLD;
+    }
+
+    /* ===== iron helpers ===== */
+    @SuppressWarnings("unused")
+    private boolean wouldIronRejectEntry(BlockPos neighborPos, Direction ourForward) {
+        if (level == null) return false;
+        BlockState ns = level.getBlockState(neighborPos);
+        if (!(ns.getBlock() instanceof IronPipeBlock)) return false;
+        Direction enteringFrom = ourForward.getOpposite();
+        return !IronPipeBlock.canItemEnterFrom(ns, enteringFrom);
+    }
+
+    /* ================= EnginePulseAcceptorApi ================= */
+
+    @Override
+    public boolean acceptEnginePulse(Direction from) {
+        if (level == null || level.isClientSide) return false;
+        if (trips.size() >= MAX_TRIPS_PER_PIPE) return false;
+
+        long now = level.getGameTime();
+        long last = lastPulseTickBySide.getOrDefault(from, Long.MIN_VALUE);
+        if (last == now) return true; // already honored a pulse from this side this tick
+        lastPulseTickBySide.put(from, now);
+
+        boolean moved = OneAtATimeItemPuller.pulseExtractOne((Level) level, worldPosition, from);
+
+        if (moved) {
+            setChanged();
+            requestSyncNow();
+        }
+        return true; // pulse consumed even if nothing moved
     }
 }

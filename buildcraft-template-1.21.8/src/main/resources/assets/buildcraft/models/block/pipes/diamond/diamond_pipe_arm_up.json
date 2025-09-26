@@ -1,4 +1,23 @@
 {
-  "parent": "buildcraft:block/pipes/_template/pipe_arm_up",
-  "textures": { "pipe": "buildcraft:block/pipetextures/diamond_pipe_texture" }
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout_mipped",
+  "textures": {
+    "all": "buildcraft:block/pipetextures/items_diamond_up",
+    "particle": "buildcraft:block/pipetextures/diamond_pipe"
+  },
+  "elements": [
+    {
+      "from": [4, 12, 4],
+      "to":   [12, 16, 12],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west":  { "texture": "#all" },
+        "east":  { "texture": "#all" },
+        "up":    { "texture": "#all" },
+        "down":  { "texture": "#all" }
+      }
+    }
+  ]
 }

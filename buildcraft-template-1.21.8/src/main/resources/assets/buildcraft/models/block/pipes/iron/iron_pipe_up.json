@@ -1,6 +1,23 @@
 {
-  "parent": "buildcraft:block/pipes/_template/pipe_arm_up",
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout_mipped",
   "textures": {
-    "texture": "buildcraft:block/pipetextures/iron_pipe_texture"
-  }
+    "all": "buildcraft:block/pipetextures/iron_clear_pipe",
+    "particle": "buildcraft:block/pipetextures/iron_clear_pipe"
+  },
+  "elements": [
+    {
+      "from": [6, 0, 6],
+      "to":   [10, 16, 10],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west":  { "texture": "#all" },
+        "east":  { "texture": "#all" },
+        "up":    { "texture": "#all" },
+        "down":  { "texture": "#all" }
+      }
+    }
+  ]
 }

@@ -1,7 +1,9 @@
+// src/main/java/com/nick/buildcraft/content/block/pipe/PipeTransport.java
 package com.nick.buildcraft.content.block.pipe;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -10,32 +12,30 @@ import net.neoforged.neoforge.items.IItemHandler;
 import java.util.*;
 
 /**
- * Tiny BFS router for the item pipe network.
- *
- * - Starts at a source pipe and explores adjacent pipe nodes (skipping the side we received from).
- * - The first adjacent non-pipe that exposes an ItemHandler on the touching face is treated as the sink.
- * - Returns the list of intermediate pipe nodes AFTER the start pipe, plus the sink position & face.
- *
- * Intentionally lightweight and server-side only.
+ * Lightweight BFS router:
+ *  - walks only through connected pipe blocks
+ *  - the first adjacent non-pipe with an ItemHandler is the sink
+ *  - returns intermediate pipe nodes AFTER the start, plus sink position/face
+ *  - respects DiamondPipe filters (color rows -> directions)
+ *  - NEW: respects border firewalls (won't step into a neighbor pipe that would reject entry)
  */
 public final class PipeTransport {
 
-    /** Result returned to the pipe. */
     public record Path(List<BlockPos> nodes, BlockPos sinkPos, Direction sinkFace) {}
 
-    private static final int MAX_VISITED = 512; // simple safety
+    private static final int MAX_VISITED = 512;
 
     private PipeTransport() {}
 
-    /**
-     * @param level The world (server).
-     * @param start The pipe BE world position that is starting the trip.
-     * @param receivedFrom Side of {@code start} where the item entered (avoid immediately going back).
-     */
+    /** Backwards-compatible wrapper (no filtering if stack unknown). */
     public static Path findPath(Level level, BlockPos start, Direction receivedFrom) {
+        return findPath(level, start, receivedFrom, ItemStack.EMPTY);
+    }
+
+    /** Routing with knowledge of the moving stack (enables DiamondPipe filtering + border firewall). */
+    public static Path findPath(Level level, BlockPos start, Direction receivedFrom, ItemStack movingStack) {
         if (level == null || level.isClientSide) return null;
 
-        // BFS over connected pipe blocks
         ArrayDeque<BlockPos> q = new ArrayDeque<>();
         Map<BlockPos, BlockPos> came = new HashMap<>();
         Set<BlockPos> visited = new HashSet<>();
@@ -48,15 +48,23 @@ public final class PipeTransport {
             BlockState curState = level.getBlockState(cur);
             if (!(curState.getBlock() instanceof BaseItemPipeBlock)) continue;
 
-            // Explore 6 neighbors
+            // Allowed directions at this node (diamond filter constraint)
+            EnumSet<Direction> allowedHere = allowedDirections(level, cur, movingStack);
+
             for (Direction d : Direction.values()) {
-                // 1) Don’t immediately go back into the face we received from at the start
+                // avoid instant U-turn at the entry pipe
                 if (cur.equals(start) && d == receivedFrom) continue;
+                // respect Diamond filter at this node
+                if (!allowedHere.contains(d)) continue;
 
                 BlockPos nbr = cur.relative(d);
 
-                // If neighbor is a pipe AND both sides have arms toward each other, expand BFS
+                // Continue BFS into a pipe only if both sides connect AND the neighbor wouldn't reject entry
                 if (isPipe(level, nbr) && connects(curState, d) && connects(level.getBlockState(nbr), d.getOpposite())) {
+                    // BORDER FIREWALL: don't traverse into a pipe that would reject from this side
+                    if (neighborRejectsAtBorder(level, nbr, d.getOpposite(), movingStack)) {
+                        continue;
+                    }
                     if (visited.add(nbr)) {
                         came.put(nbr, cur);
                         q.addLast(nbr);
@@ -64,27 +72,48 @@ public final class PipeTransport {
                     continue;
                 }
 
-                // Otherwise, if neighbor is NOT a pipe: check for an insertable handler on that face
-                if (!isPipe(level, nbr)) {
+                // non-pipe neighbor: check for insertable item handler; also require this side is open
+                if (!isPipe(level, nbr) && connects(curState, d)) {
                     IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, nbr, d.getOpposite());
                     if (handler != null) {
-                        // Found a sink touching 'cur' via direction 'd'
                         List<BlockPos> route = reconstruct(came, start, cur);
                         return new Path(route, nbr.immutable(), d.getOpposite());
                     }
                 }
             }
         }
-        return null; // no route to an inventory found
+        return null;
     }
 
-    /* -------------------------- helpers -------------------------- */
+    /* ---------------- Diamond filter hook ---------------- */
+
+    private static EnumSet<Direction> allowedDirections(Level level, BlockPos pos, ItemStack stack) {
+        var be = level.getBlockEntity(pos);
+        if (be instanceof DiamondPipeBlockEntity dp) {
+            var allowed = dp.getAllowedDirections(stack);
+            // empty = "no restriction" -> all dirs allowed
+            if (!allowed.isEmpty()) return allowed;
+        }
+        return EnumSet.allOf(Direction.class);
+    }
+
+    /* ---------------- Border firewall hook ---------------- */
+
+    /** True if the neighbor pipe would reject an item entering from the given face. */
+    private static boolean neighborRejectsAtBorder(Level level, BlockPos neighborPos, Direction enterFrom, ItemStack stack) {
+        var be = level.getBlockEntity(neighborPos);
+        if (be instanceof StonePipeBlockEntity n) {
+            return n.shouldRejectAtBorder(enterFrom, stack);
+        }
+        return false;
+    }
+
+    /* ---------------- helpers ---------------- */
 
     private static boolean isPipe(Level level, BlockPos p) {
         return level.getBlockState(p).getBlock() instanceof BaseItemPipeBlock;
     }
 
-    /** Use BaseItemPipeBlock’s boolean properties to verify an arm in that direction exists. */
     private static boolean connects(BlockState state, Direction dir) {
         if (!(state.getBlock() instanceof BaseItemPipeBlock)) return false;
         return switch (dir) {
@@ -97,7 +126,6 @@ public final class PipeTransport {
         };
     }
 
-    /** Rebuild the list of pipe nodes after 'start' up to and including 'lastPipe'. */
     private static List<BlockPos> reconstruct(Map<BlockPos, BlockPos> came, BlockPos start, BlockPos lastPipe) {
         ArrayDeque<BlockPos> stack = new ArrayDeque<>();
         BlockPos cur = lastPipe;
@@ -105,6 +133,6 @@ public final class PipeTransport {
             stack.addFirst(cur);
             cur = came.get(cur);
         }
-        return new ArrayList<>(stack); // nodes AFTER start
+        return new ArrayList<>(stack);
     }
 }

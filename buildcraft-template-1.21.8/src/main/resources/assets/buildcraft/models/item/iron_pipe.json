@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "buildcraft:block/pipetextures/iron_pipe_texture"
+    "layer0": "buildcraft:block/pipetextures/iron_clear_pipe"
   }
 }

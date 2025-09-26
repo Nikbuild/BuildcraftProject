@@ -1,6 +1,8 @@
+// src/main/java/com/nick/buildcraft/registry/ModItems.java
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
+import com.nick.buildcraft.content.item.WrenchItem;   // <-- NEW
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -17,11 +19,9 @@ public final class ModItems {
 
     /* ---------- Block items ---------- */
 
-    /** Quarry controller block item (id matches blockstate filename). */
     public static final DeferredItem<BlockItem> QUARRY_CONTROLLER_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_quarry_controller", ModBlocks.QUARRY_CONTROLLER);
 
-    /** Engine block items */
     public static final DeferredItem<BlockItem> MODEL_ITEM_REDSTONE_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_redstone_engine", ModBlocks.REDSTONE_ENGINE);
 
@@ -93,4 +93,18 @@ public final class ModItems {
                                     ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_diamond")
                             )
                     )));
+
+    /* ---------- Tools ---------- */
+
+    public static final DeferredItem<Item> WRENCH =
+            ITEMS.register("wrench", // <-- no subfolder here
+                    () -> new WrenchItem(
+                            new Item.Properties()
+                                    .stacksTo(1)
+                                    .setId(ResourceKey.create(
+                                            Registries.ITEM,
+                                            ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "wrench")
+                                    ))
+                    ));
+
 }

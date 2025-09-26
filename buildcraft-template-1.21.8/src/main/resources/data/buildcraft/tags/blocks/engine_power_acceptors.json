@@ -1,7 +1,10 @@
 {
   "replace": false,
   "values": [
+    "buildcraft:wood_pipe",
     "buildcraft:blockstate_quarry_controller",
-    "minecraft:furnace"
+    "minecraft:furnace",
+    "minecraft:chest",
+    "minecraft:hopper"
   ]
 }

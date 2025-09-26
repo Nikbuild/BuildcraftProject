@@ -1,3 +1,4 @@
+// src/main/java/com/nick/buildcraft/registry/ModTags.java
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
@@ -10,14 +11,14 @@ import net.minecraft.world.level.block.Block;
 public final class ModTags {
     private ModTags() {}
 
-    /** Any block that should be auto-faced by engines and treated as a power sink. */
+    /** Any block that engines should auto-face and treat as a power sink. */
     public static final TagKey<Block> ENGINE_POWER_ACCEPTORS =
             TagKey.create(
                     Registries.BLOCK,
                     ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "engine_power_acceptors")
             );
 
-    /** Kept from your original example – not required by the engine logic here. */
+    /** Optional/legacy; kept for parity with your repo. */
     public static final TagKey<Block> HAS_INVENTORY =
             TagKey.create(
                     Registries.BLOCK,

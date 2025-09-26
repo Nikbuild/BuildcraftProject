@@ -1,11 +1,23 @@
 {
   "multipart": [
     { "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_core" } },
-    { "when": { "up": true },    "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_up" } },
-    { "when": { "down": true },  "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_down" } },
-    { "when": { "north": true }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_north" } },
-    { "when": { "south": true }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_south" } },
-    { "when": { "west": true },  "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_west" } },
-    { "when": { "east": true },  "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_east" } }
+
+    { "when": { "north": true, "north_out": true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_north" } },
+    { "when": { "north": true, "north_out": false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_north" } },
+
+    { "when": { "south": true, "south_out": true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_south" } },
+    { "when": { "south": true, "south_out": false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_south" } },
+
+    { "when": { "east":  true, "east_out":  true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_east" } },
+    { "when": { "east":  true, "east_out":  false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_east" } },
+
+    { "when": { "west":  true, "west_out":  true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_west" } },
+    { "when": { "west":  true, "west_out":  false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_west" } },
+
+    { "when": { "up":    true, "up_out":    true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_up" } },
+    { "when": { "up":    true, "up_out":    false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_up" } },
+
+    { "when": { "down":  true, "down_out":  true  }, "apply": { "model": "buildcraft:block/pipes/iron/iron_pipe_arm_down" } },
+    { "when": { "down":  true, "down_out":  false }, "apply": { "model": "buildcraft:block/pipes/iron/iron_solid_pipe_arm_down" } }
   ]
 }

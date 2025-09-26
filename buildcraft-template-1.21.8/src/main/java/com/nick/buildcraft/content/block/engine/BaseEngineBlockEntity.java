@@ -1,13 +1,15 @@
+// src/main/java/com/nick/buildcraft/content/block/engine/BaseEngineBlockEntity.java
 package com.nick.buildcraft.content.block.engine;
 
 import com.nick.buildcraft.energy.BCEnergyStorage;
 import com.nick.buildcraft.energy.Energy;
+import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;  // <-- import
-import net.minecraft.world.level.block.state.BlockState;       // <-- import
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -21,6 +23,9 @@ import java.util.List;
  * - warmup/generation
  * - small internal FE buffer
  * - pushes FE to neighbors (prioritizing the block's FACING)
+ *
+ // NOTE: Pulse delivery to neighbors now happens in EngineBlockEntity (once per pump), not here per tick.
+ * (once per pump), not here per tick.
  */
 public abstract class BaseEngineBlockEntity extends BlockEntity {
 
@@ -29,7 +34,7 @@ public abstract class BaseEngineBlockEntity extends BlockEntity {
 
     private int warmupTicks;
 
-    protected BaseEngineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) { // <-- BlockEntityType<?>
+    protected BaseEngineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
     }
 
@@ -48,13 +53,12 @@ public abstract class BaseEngineBlockEntity extends BlockEntity {
             be.warmupTicks = Math.max(0, be.warmupTicks - 2);
         }
 
-        // Determine push order: FACING first (if present), then the rest
+        // push FE to neighbors (shared budget); face first
         List<Direction> order = new ArrayList<>(6);
         Direction facing = state.hasProperty(EngineBlock.FACING) ? state.getValue(EngineBlock.FACING) : null;
         if (facing != null) order.add(facing);
         for (Direction d : Direction.values()) if (d != facing) order.add(d);
 
-        // push FE to neighbors (shared budget)
         int remaining = Math.min(be.buffer.getEnergyStored(), Energy.ENGINE_MAX_IO);
         if (remaining > 0) {
             for (Direction dir : order) {

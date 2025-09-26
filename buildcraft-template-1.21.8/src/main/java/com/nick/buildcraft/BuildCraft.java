@@ -52,6 +52,9 @@ public class BuildCraft {
                                 out.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE.get());
                                 out.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE.get());
 
+                                // Tools
+                                out.accept(ModItems.WRENCH); // ← ADD: wrench in the BuildCraft main tab
+
                                 // Gears
                                 out.accept(ModItems.GEAR_WOOD);
                                 out.accept(ModItems.GEAR_STONE);
@@ -112,6 +115,11 @@ public class BuildCraft {
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
             event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);
             event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
+        }
+
+        // ← ADD: show the wrench in the Tools & Utilities tab
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(ModItems.WRENCH);
         }
     }
 

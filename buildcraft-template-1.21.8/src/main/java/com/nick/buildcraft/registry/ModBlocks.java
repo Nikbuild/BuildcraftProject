@@ -9,6 +9,7 @@ import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
 import com.nick.buildcraft.content.block.quarry.QuarryBlock;
+import com.nick.buildcraft.content.block.tank.TankBlock; // <-- NEW
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -187,6 +188,22 @@ public final class ModBlocks {
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
                                     ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "moving_engine_ring")
+                            ))
+            )
+    );
+
+    /** Fluid Tank block */
+    public static final DeferredBlock<Block> TANK = BLOCKS.register(
+            "blockstate_tank", // <-- CHANGED
+            () -> new TankBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .noOcclusion()
+                            .strength(2.0F, 6.0F)
+                            .requiresCorrectToolForDrops()
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_tank") // <-- CHANGED
                             ))
             )
     );

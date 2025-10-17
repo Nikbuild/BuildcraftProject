@@ -4,8 +4,10 @@ import com.mojang.logging.LogUtils;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModBlocks;
 import com.nick.buildcraft.registry.ModEntities;
+import com.nick.buildcraft.registry.ModFeatures;      // ← ADD
+import com.nick.buildcraft.registry.ModFluids;        // fluids
 import com.nick.buildcraft.registry.ModItems;
-import com.nick.buildcraft.registry.ModMenus;        // ← NEW
+import com.nick.buildcraft.registry.ModMenus;         // menus
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -53,7 +55,12 @@ public class BuildCraft {
                                 out.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE.get());
 
                                 // Tools
-                                out.accept(ModItems.WRENCH); // ← ADD: wrench in the BuildCraft main tab
+                                out.accept(ModItems.WRENCH);
+                                out.accept(ModItems.TANK_ITEM.get());
+
+                                // Fluids (buckets)
+                                out.accept(ModFluids.BUCKET_OIL.get());
+                                out.accept(ModFluids.BUCKET_FUEL.get());
 
                                 // Gears
                                 out.accept(ModItems.GEAR_WOOD);
@@ -75,7 +82,9 @@ public class BuildCraft {
         ModItems.ITEMS.register(modEventBus);
         ModBlockEntity.BLOCK_ENTITIES.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
-        ModMenus.MENUS.register(modEventBus);        // ← NEW (menus)
+        ModMenus.MENUS.register(modEventBus);
+        ModFluids.register(modEventBus);
+        ModFeatures.FEATURES.register(modEventBus);   // ← ADD: features (oil spout)
         CREATIVE_MODE_TABS.register(modEventBus);
 
         // config
@@ -117,13 +126,11 @@ public class BuildCraft {
             event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
         }
 
-        // ← ADD: show the wrench in the Tools & Utilities tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.WRENCH);
         }
     }
 
-    // No @SubscribeEvent needed when using addListener
     private void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("BuildCraft server starting");
     }

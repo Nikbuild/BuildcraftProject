@@ -1,4 +1,6 @@
 {
+  "itemGroup.buildcraft": "BuildCraft",
+
   "block.buildcraft.quarry": "Quarry",
   "item.buildcraft.quarry": "Quarry",
 
@@ -7,8 +9,14 @@
 
   "block.buildcraft.cobble_pipe": "Cobblestone Pipe",
   "item.buildcraft.cobble_pipe": "Cobblestone Pipe",
+
   "screen.buildcraft.stirling_engine": "Stirling Engine",
+
   "item.buildcraft.wrench": "Wrench",
 
-  "itemGroup.buildcraft": "BuildCraft"
+  "item.buildcraft.bucket_oil": "Bucket of Oil",
+  "item.buildcraft.bucket_fuel": "Bucket of Fuel",
+
+  "block.buildcraft.oil": "Oil",
+  "block.buildcraft.fuel": "Fuel"
 }

@@ -1,0 +1,20 @@
+{
+  "variants": {
+    "level=0":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=1":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=2":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=3":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=4":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=5":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=6":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=7":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=8":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=9":  { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=10": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=11": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=12": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=13": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=14": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" },
+    "level=15": { "model": "buildcraft:block/fluids/fuel_light_heat_0_still" }
+  }
+}

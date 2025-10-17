@@ -1,0 +1,51 @@
+{
+  "ambientocclusion": false,
+  "render_type": "cutout",
+  "textures": {
+    "particle": "buildcraft:block/tank/side_joined_below",
+    "side": "buildcraft:block/tank/side_joined_below",
+    "end": "buildcraft:block/tank/end"
+  },
+  "elements": [
+    {
+      "from": [1, 16, 1],
+      "to": [15, 16, 15],
+      "faces": {
+        "up":   { "texture": "#end", "uv": [2, 2, 14, 14], "cullface": "up" },
+        "down": { "texture": "#end", "uv": [2, 2, 14, 14] }
+      }
+    },
+    {
+      "from": [1, 0, 1],
+      "to": [15, 16, 2],
+      "faces": {
+        "north": { "texture": "#side", "uv": [2, 0, 14, 16], "cullface": "north" },
+        "south": { "texture": "#side", "uv": [2, 0, 14, 16] }
+      }
+    },
+    {
+      "from": [1, 0, 14],
+      "to": [15, 16, 15],
+      "faces": {
+        "south": { "texture": "#side", "uv": [2, 0, 14, 16], "cullface": "south" },
+        "north": { "texture": "#side", "uv": [2, 0, 14, 16] }
+      }
+    },
+    {
+      "from": [1, 0, 1],
+      "to": [2, 16, 15],
+      "faces": {
+        "west": { "texture": "#side", "uv": [2, 0, 14, 16], "cullface": "west" },
+        "east": { "texture": "#side", "uv": [2, 0, 14, 16] }
+      }
+    },
+    {
+      "from": [14, 0, 1],
+      "to": [15, 16, 15],
+      "faces": {
+        "east": { "texture": "#side", "uv": [2, 0, 14, 16], "cullface": "east" },
+        "west": { "texture": "#side", "uv": [2, 0, 14, 16] }
+      }
+    }
+  ]
+}

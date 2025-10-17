@@ -1,8 +1,7 @@
-// src/main/java/com/nick/buildcraft/registry/ModItems.java
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
-import com.nick.buildcraft.content.item.WrenchItem;   // <-- NEW
+import com.nick.buildcraft.content.item.WrenchItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -14,24 +13,25 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class ModItems {
     private ModItems() {}
 
+    // === Deferred Register ===
     public static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(BuildCraft.MODID);
 
-    /* ---------- Block items ---------- */
+    /* ---------- Block Items ---------- */
 
+    // Quarry
     public static final DeferredItem<BlockItem> QUARRY_CONTROLLER_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_quarry_controller", ModBlocks.QUARRY_CONTROLLER);
 
+    // Engines
     public static final DeferredItem<BlockItem> MODEL_ITEM_REDSTONE_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_redstone_engine", ModBlocks.REDSTONE_ENGINE);
-
     public static final DeferredItem<BlockItem> MODEL_ITEM_STIRLING_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_stirling_engine", ModBlocks.STIRLING_ENGINE);
-
     public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);
 
-    /** Pipes */
+    // Pipes
     public static final DeferredItem<BlockItem> STONE_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("stone_pipe", ModBlocks.STONE_PIPE);
     public static final DeferredItem<BlockItem> COBBLE_PIPE_ITEM =
@@ -45,59 +45,53 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> WOOD_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("wood_pipe", ModBlocks.WOOD_PIPE);
 
-    // (Intentionally no Frame item; frames are placed by the quarry itself.)
+    // Tank (NEW)
+    public static final DeferredItem<BlockItem> TANK_ITEM =
+            ITEMS.registerSimpleBlockItem("model_items_tank", ModBlocks.TANK); // <-- CHANGED
 
-    /* ---------- Gear items (simple Items, not blocks) ---------- */
+    // (No frame item; frames are placed by quarry itself)
+
+    /* ---------- Gear Items ---------- */
 
     public static final DeferredItem<Item> GEAR_WOOD =
             ITEMS.register("gear_wood",
                     () -> new Item(new Item.Properties().setId(
-                            ResourceKey.create(
-                                    Registries.ITEM,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_wood")
-                            )
+                            ResourceKey.create(Registries.ITEM,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_wood"))
                     )));
 
     public static final DeferredItem<Item> GEAR_STONE =
             ITEMS.register("gear_stone",
                     () -> new Item(new Item.Properties().setId(
-                            ResourceKey.create(
-                                    Registries.ITEM,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_stone")
-                            )
+                            ResourceKey.create(Registries.ITEM,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_stone"))
                     )));
 
     public static final DeferredItem<Item> GEAR_IRON =
             ITEMS.register("gear_iron",
                     () -> new Item(new Item.Properties().setId(
-                            ResourceKey.create(
-                                    Registries.ITEM,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_iron")
-                            )
+                            ResourceKey.create(Registries.ITEM,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_iron"))
                     )));
 
     public static final DeferredItem<Item> GEAR_GOLD =
             ITEMS.register("gear_gold",
                     () -> new Item(new Item.Properties().setId(
-                            ResourceKey.create(
-                                    Registries.ITEM,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_gold")
-                            )
+                            ResourceKey.create(Registries.ITEM,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_gold"))
                     )));
 
     public static final DeferredItem<Item> GEAR_DIAMOND =
             ITEMS.register("gear_diamond",
                     () -> new Item(new Item.Properties().setId(
-                            ResourceKey.create(
-                                    Registries.ITEM,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_diamond")
-                            )
+                            ResourceKey.create(Registries.ITEM,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "gear_diamond"))
                     )));
 
     /* ---------- Tools ---------- */
 
     public static final DeferredItem<Item> WRENCH =
-            ITEMS.register("wrench", // <-- no subfolder here
+            ITEMS.register("wrench",
                     () -> new WrenchItem(
                             new Item.Properties()
                                     .stacksTo(1)
@@ -106,5 +100,4 @@ public final class ModItems {
                                             ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "wrench")
                                     ))
                     ));
-
 }

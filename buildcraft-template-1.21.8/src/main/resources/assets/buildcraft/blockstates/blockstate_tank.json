@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "joined_below=false,joined_above=false": { "model": "buildcraft:block/tank/models_block_tank_single" },
+    "joined_below=true,joined_above=false":  { "model": "buildcraft:block/tank/models_block_tank_top" },
+    "joined_below=false,joined_above=true":  { "model": "buildcraft:block/tank/models_block_tank_bottom" },
+    "joined_below=true,joined_above=true":   { "model": "buildcraft:block/tank/models_block_tank_mid" }
+  }
+}

@@ -12,6 +12,7 @@ import com.nick.buildcraft.content.block.pipe.DiamondPipeBlock;
 import com.nick.buildcraft.content.block.pipe.DiamondPipeBlockEntity;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
+import com.nick.buildcraft.content.block.tank.TankBlockEntity; // ← NEW
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -26,6 +27,7 @@ public final class ModBlockEntity {
 
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = BLOCK_ENTITY_TYPES;
 
+    /** Quarry controller block entity */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<QuarryBlockEntity>> QUARRY_CONTROLLER =
             BLOCK_ENTITY_TYPES.register("quarry_controller",
                     () -> new BlockEntityType<>(
@@ -88,6 +90,14 @@ public final class ModBlockEntity {
                     () -> new BlockEntityType<>(
                             EngineRingMovingBlockEntity::new,
                             Set.of(ModBlocks.MOVING_ENGINE_RING.get()))
+            );
+
+    /** Tank block entity registration */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TankBlockEntity>> TANK =
+            BLOCK_ENTITY_TYPES.register("tank",
+                    () -> new BlockEntityType<>(
+                            TankBlockEntity::new,
+                            Set.of(ModBlocks.TANK.get()))
             );
 
     private ModBlockEntity() {}

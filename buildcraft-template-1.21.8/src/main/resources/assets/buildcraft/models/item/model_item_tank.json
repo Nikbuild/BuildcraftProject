@@ -1,0 +1,55 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "buildcraft:block/tank/side",
+    "side":     "buildcraft:block/tank/side",
+    "end":      "buildcraft:block/tank/end"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to":   [14, 16, 14],
+      "faces": {
+        "north": { "texture": "#side", "uv": [2, 0, 14, 16] },
+        "south": { "texture": "#side", "uv": [2, 0, 14, 16] },
+        "east":  { "texture": "#side", "uv": [2, 0, 14, 16] },
+        "west":  { "texture": "#side", "uv": [2, 0, 14, 16] },
+        "up":    { "texture": "#end",  "uv": [2, 2, 14, 14] },
+        "down":  { "texture": "#end",  "uv": [2, 2, 14, 14] }
+      }
+    }
+  ],
+  "gui_light": "front",
+  "display": {
+    "gui": {
+      "rotation": [30, 225, 0],
+      "translation": [0, 0, 0],
+      "scale": [0.70, 0.70, 0.70]
+    },
+    "ground": {
+      "rotation": [0, 0, 0],
+      "translation": [0, 3, 0],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "fixed": {
+      "rotation": [0, 180, 0],
+      "translation": [0, 0, 0],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "thirdperson_righthand": {
+      "rotation": [10, -45, 170],
+      "translation": [0, 1.5, -2],
+      "scale": [0.375, 0.375, 0.375]
+    },
+    "firstperson_righthand": {
+      "rotation": [0, -35, 0],
+      "translation": [1.13, 3.2, 1.13],
+      "scale": [0.68, 0.68, 0.68]
+    },
+    "firstperson_lefthand": {
+      "rotation": [0, 35, 0],
+      "translation": [1.13, 3.2, 1.13],
+      "scale": [0.68, 0.68, 0.68]
+    }
+  }
+}

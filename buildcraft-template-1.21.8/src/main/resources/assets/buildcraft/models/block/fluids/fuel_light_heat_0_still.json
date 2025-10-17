@@ -1,0 +1,6 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "particle": "buildcraft:block/fluids/fuel_light_heat_0_still"
+  }
+}

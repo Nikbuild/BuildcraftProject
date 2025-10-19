@@ -96,6 +96,9 @@ public class QuarryBlockEntity extends BlockEntity {
 
     // Persisted layer/path state
     private Integer layerY = null;            // current working layer (world Y)
+    public Integer getLayerY() {
+        return layerY;
+    }
     private boolean layerLeftToRight = false; // LOCAL boustro parity
     private boolean layerStartAtTop  = false; // LOCAL near/far parity
 
@@ -1078,7 +1081,7 @@ public class QuarryBlockEntity extends BlockEntity {
 
     /* ---------- geometry shared with the block ---------- */
 
-    static Bounds boundsForFacing(BlockPos pos, Direction facing) {
+    public static Bounds boundsForFacing(BlockPos pos, Direction facing) {
         final int size = 2 * HALF + 1;
         int x0, x1, z0, z1;
         int y0 = pos.getY(), y1 = pos.getY() + HEIGHT;
@@ -1113,14 +1116,20 @@ public class QuarryBlockEntity extends BlockEntity {
     }
 
     /* ---------- tiny bounds record ---------- */
-    static final class Bounds {
-        final int x0, y0, z0, x1, y1, z1;
-        Bounds(int x0, int y0, int z0, int x1, int y1, int z1) {
-            this.x0 = x0; this.y0 = y0; this.z0 = z0; this.x1 = x1; this.y1 = y1; this.z1 = z1;
+    public static final class Bounds {
+        public final int x0, y0, z0, x1, y1, z1;
+        public Bounds(int x0, int y0, int z0, int x1, int y1, int z1) {
+            this.x0 = x0;
+            this.y0 = y0;
+            this.z0 = z0;
+            this.x1 = x1;
+            this.y1 = y1;
+            this.z1 = z1;
         }
-        BlockPos min() { return new BlockPos(x0, y0, z0); }
-        BlockPos max() { return new BlockPos(x1, y1, z1); }
+        public BlockPos min() { return new BlockPos(x0, y0, z0); }
+        public BlockPos max() { return new BlockPos(x1, y1, z1); }
     }
+
 
     /* ====================================================================== */
     /*  PUBLIC HOOKS FOR RENDER/PREDICTION (read-only)                         */

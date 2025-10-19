@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -18,10 +19,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Stacked tanks behave as one column; renderer draws a translucent “water cap” per block. */
+/**
+ * Stacked tanks behave as one column; renderer draws a translucent continuous fluid volume.
+ * This version includes a dynamic AABB that ensures the column stays visible when the base block is off-screen.
+ */
 public class TankBlockEntity extends BlockEntity {
 
-    /** 16 buckets per block. */
+    /** Each tank holds 16 buckets (16,000 mB). */
     public static final int CAPACITY = 16_000;
 
     /** Per-block storage. The column capability wraps this. */
@@ -32,17 +36,16 @@ public class TankBlockEntity extends BlockEntity {
             Level lvl = getLevel();
             if (lvl == null || lvl.isClientSide) return;
 
-            // 1) Recalculate column once on the server.
+            // Recalculate column once on the server
             recomputeColumnCache();
 
-            // 2) Tell EVERY segment in the column that “the total changed” so they
-            //    update their animation baselines AND force a mesh rebuild on clients.
+            // Notify all column segments of change
             BlockPos p = getColumnBottom();
             for (int i = 0; i < getColumnSize(); i++) {
                 BlockEntity be = lvl.getBlockEntity(p);
                 if (be instanceof TankBlockEntity tbe) {
-                    tbe.onColumnContentsChanged(); // update baselines (works server/client)
-                    // Force chunk rebuild on clients for that block (the important bit).
+                    tbe.onColumnContentsChanged();
+                    // Force chunk rebuild on clients
                     lvl.sendBlockUpdated(p, tbe.getBlockState(), tbe.getBlockState(), 3);
                 }
                 p = p.above();
@@ -63,8 +66,8 @@ public class TankBlockEntity extends BlockEntity {
     private final IFluidHandler columnHandler = new ColumnFluidHandler();
 
     /* -------- client animation state (not saved) -------- */
-    private int  clientPrevTotal;
-    private int  clientCurTotal;
+    private int clientPrevTotal;
+    private int clientCurTotal;
     private long clientChangeGameTime;
 
     public TankBlockEntity(BlockPos pos, BlockState state) {
@@ -92,7 +95,6 @@ public class TankBlockEntity extends BlockEntity {
         super.onLoad();
         recomputeColumnCache();
 
-        // Seed animation baselines with the current total.
         Level lvl = getLevel();
         ColumnInfo col = scanColumn(lvl, getBlockPos());
         int total = (col == null) ? 0 : col.totalAmount;
@@ -156,11 +158,9 @@ public class TankBlockEntity extends BlockEntity {
         BlockEntity be = level.getBlockEntity(origin);
         if (!(be instanceof TankBlockEntity)) return null;
 
-        // Bottom
         BlockPos bottom = origin;
         while (isTank(level, bottom.below())) bottom = bottom.below();
 
-        // Upwards aggregation
         int size = 0, total = 0;
         FluidStack rep = FluidStack.EMPTY;
         BlockPos p = bottom;
@@ -346,7 +346,9 @@ public class TankBlockEntity extends BlockEntity {
 
     /* ----------------- Animation helpers ----------------- */
 
-    /** Column total changed: refresh easing baseline and (server side) we already poked chunk rebuilds. */
+
+
+    /** Called when total fluid changes to update client interpolation state. */
     public void onColumnContentsChanged() {
         Level lvl = getLevel();
         ColumnInfo col = scanColumn(lvl, getBlockPos());
@@ -371,4 +373,8 @@ public class TankBlockEntity extends BlockEntity {
         float curH  = (float) clientCurTotal  / (float) CAPACITY;
         return prevH + (curH - prevH) * t;
     }
+
+    /* ----------------- Render Bounding Box ----------------- */
+
+
 }

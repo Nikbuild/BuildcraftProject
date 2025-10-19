@@ -11,9 +11,11 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.joml.Matrix4f;
 
@@ -88,6 +90,7 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
         if (y1 <= y0) return;
 
 
+
         // --- Tint ---
         int rgb;
         if (fluid.getFluid() == ModFluids.OIL.get() || fluid.getFluid() == ModFluids.FUEL.get()) {
@@ -119,6 +122,7 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
     }
 
     /* ---------- helpers ---------- */
+
 
     private static void putFlatQuadTop(VertexConsumer vc, Matrix4f mat,
                                        float x0, float x1, float z0, float z1, float y,
@@ -185,4 +189,23 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
         vc.addVertex(mat, x, y0, z1).setColor(r,g,b,a).setUv(u1,v1).setOverlay(overlay).setLight(light).setNormal(1,0,0);
         vc.addVertex(mat, x, y0, z0).setColor(r,g,b,a).setUv(u0,v1).setOverlay(overlay).setLight(light).setNormal(1,0,0);
     }
+
+    @Override
+    public AABB getRenderBoundingBox(TankBlockEntity blockEntity) {
+        TankBlockEntity.ColumnInfo col = TankBlockEntity.scanColumn(blockEntity.getLevel(), blockEntity.getBlockPos());
+        if (col == null) {
+            return new AABB(blockEntity.getBlockPos());
+        }
+
+        BlockPos bottom = col.bottom;
+        return new AABB(
+                bottom.getX(),
+                bottom.getY(),
+                bottom.getZ(),
+                bottom.getX() + 1.0,
+                bottom.getY() + col.size,
+                bottom.getZ() + 1.0
+        ).inflate(0.1);
+    }
+
 }

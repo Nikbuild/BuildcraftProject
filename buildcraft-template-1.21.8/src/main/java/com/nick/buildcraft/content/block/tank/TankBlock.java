@@ -3,6 +3,8 @@ package com.nick.buildcraft.content.block.tank;
 import com.nick.buildcraft.registry.ModFluids;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
@@ -14,10 +16,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.*;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -32,16 +31,12 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * A glass tank that can stack vertically and act as one large column.
- * Each tank holds 16 buckets (16,000 mB).
- * Works with any fluid that has a registered bucket (water, lava, oil, fuel, etc.)
- */
 public class TankBlock extends Block implements EntityBlock {
 
     public static final BooleanProperty JOINED_BELOW = BooleanProperty.create("joined_below");
-    public static final BooleanProperty JOINED_ABOVE = BooleanProperty.create("joined_above");
+    public static final BooleanProperty JOINED_ABOVE  = BooleanProperty.create("joined_above");
 
     private static final double INSET_PX = 2.0;
     private static final VoxelShape SOLID_SHAPE =
@@ -51,101 +46,153 @@ public class TankBlock extends Block implements EntityBlock {
         super(props);
         this.registerDefaultState(this.stateDefinition.any()
                 .setValue(JOINED_BELOW, false)
-                .setValue(JOINED_ABOVE, false));
+                .setValue(JOINED_ABOVE,  false));
     }
 
     /* -------- Block entity -------- */
 
     @Override
-    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+    public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new TankBlockEntity(pos, state);
     }
 
     /* -------- Blockstate props -------- */
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(JOINED_BELOW, JOINED_ABOVE);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> b) {
+        b.add(JOINED_BELOW, JOINED_ABOVE);
     }
 
-    private static boolean isTank(BlockState s) {
-        return s.getBlock() instanceof TankBlock;
+    private static boolean isTank(BlockState s) { return s.getBlock() instanceof TankBlock; }
+
+    // Join only if neighbor is a tank *and* compatible (logic resides in BE)
+    private static boolean isCompatibleJoin(LevelReader level, BlockPos selfPos, BlockPos otherPos) {
+        if (!(level instanceof Level real)) return isTank(level.getBlockState(otherPos));
+        BlockEntity a = real.getBlockEntity(selfPos);
+        BlockEntity b = real.getBlockEntity(otherPos);
+        if (a instanceof TankBlockEntity ta && b instanceof TankBlockEntity tb) {
+            return TankBlockEntity.areCompatible(ta, tb);
+        }
+        return false;
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+    public @Nullable BlockState getStateForPlacement(BlockPlaceContext ctx) {
         Level lvl = ctx.getLevel();
         BlockPos p = ctx.getClickedPos();
         return this.defaultBlockState()
-                .setValue(JOINED_BELOW, isTank(lvl.getBlockState(p.below())))
-                .setValue(JOINED_ABOVE, isTank(lvl.getBlockState(p.above())));
+                .setValue(JOINED_BELOW, isCompatibleJoin(lvl, p, p.below()))
+                .setValue(JOINED_ABOVE,  isCompatibleJoin(lvl, p, p.above()));
     }
 
-    /** Updates neighbor connectivity (stacked tanks share faces). */
     @Override
-    protected BlockState updateShape(BlockState state,
-                                     LevelReader level,
-                                     ScheduledTickAccess scheduledTickAccess,
-                                     BlockPos pos,
-                                     Direction direction,
-                                     BlockPos neighborPos,
-                                     BlockState neighborState,
-                                     RandomSource random) {
-        if (direction == Direction.DOWN) state = state.setValue(JOINED_BELOW, isTank(neighborState));
-        if (direction == Direction.UP)   state = state.setValue(JOINED_ABOVE, isTank(neighborState));
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess scheduledTickAccess,
+                                     BlockPos pos, Direction dir, BlockPos neighborPos,
+                                     BlockState neighborState, RandomSource random) {
+        if (dir == Direction.DOWN) state = state.setValue(JOINED_BELOW, isCompatibleJoin(level, pos, neighborPos));
+        if (dir == Direction.UP)   state = state.setValue(JOINED_ABOVE,  isCompatibleJoin(level, pos, neighborPos));
 
-        if (level instanceof Level real && !real.isClientSide) {
+        if (level instanceof Level real) {
             BlockEntity be = real.getBlockEntity(pos);
-            if (be instanceof TankBlockEntity tbe) tbe.onNeighborChanged();
+            if (be instanceof TankBlockEntity tbe) {
+                tbe.onNeighborChanged();
+                if (!real.isClientSide && (dir.getAxis() == Direction.Axis.Y)) tbe.compactDownwardServer();
+            }
+            real.invalidateCapabilities(pos);
+            real.sendBlockUpdated(pos, state, state, UPDATE_CLIENTS);
         }
         return state;
     }
 
-    /* -------- Interaction logic (universal bucket support) -------- */
+    @Override
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+        if (!level.isClientSide) {
+            level.invalidateCapabilities(pos);
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof TankBlockEntity tbe) tbe.compactDownwardServer();
+        }
+    }
+
+    @Override
+    public void destroy(LevelAccessor level, BlockPos pos, BlockState state) {
+        super.destroy(level, pos, state);
+        if (level instanceof Level real) {
+            real.invalidateCapabilities(pos);
+            real.sendBlockUpdated(pos, state, state, UPDATE_CLIENTS);
+            for (BlockPos p : new BlockPos[] { pos.above(), pos.below() }) {
+                BlockState s = real.getBlockState(p);
+                real.sendBlockUpdated(p, s, s, UPDATE_CLIENTS);
+                BlockEntity be = real.getBlockEntity(p);
+                if (be instanceof TankBlockEntity tbe) {
+                    tbe.onNeighborChanged();
+                    if (!real.isClientSide) tbe.compactDownwardServer();
+                    real.invalidateCapabilities(p);
+                }
+            }
+        }
+    }
+
+    /* -------- Interaction logic (now supports milk bucket too) -------- */
 
     @Override
     protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                           Player player, InteractionHand hand, BlockHitResult hit) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
+
         BlockEntity be = level.getBlockEntity(pos);
         if (!(be instanceof TankBlockEntity tankBe)) return InteractionResult.PASS;
 
-        IFluidHandler handler = tankBe.getColumnHandler();
+        IFluidHandler handlerColumn = tankBe.getColumnHandler();
 
-        // --- FILL with any fluid bucket ---
+        // --- FILL with any BucketItem (works for water/lava + modded bucket fluids) ---
         if (stack.getItem() instanceof BucketItem bucketItem) {
             Fluid fluid = bucketItem.content;
             if (fluid != null && fluid != Fluids.EMPTY) {
-                int filled = handler.fill(new FluidStack(fluid, 1000), IFluidHandler.FluidAction.EXECUTE);
-                if (filled > 0) {
-                    if (!player.isCreative()) {
-                        player.setItemInHand(hand, new ItemStack(Items.BUCKET));
-                    }
-                    level.playSound(null, pos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
+                int filled = handlerColumn.fill(new net.neoforged.neoforge.fluids.FluidStack(fluid, 1000),
+                        IFluidHandler.FluidAction.EXECUTE);
+                if (filled == 1000) {
+                    if (!player.isCreative()) player.setItemInHand(hand, new ItemStack(Items.BUCKET));
+                    level.playSound(null, pos,
+                            fluid.isSame(Fluids.LAVA) ? SoundEvents.BUCKET_EMPTY_LAVA : SoundEvents.BUCKET_EMPTY,
+                            SoundSource.BLOCKS, 1.0F, 1.0F);
                     be.setChanged();
                     level.sendBlockUpdated(pos, state, state, 3);
-                    // 👇 Fix for first-fill invisibility
-                    level.sendBlockUpdated(pos, state, state, 3);
-                    level.invalidateCapabilities(pos); // optional: re-sync fluid caps if needed
+                    level.invalidateCapabilities(pos);
                     return InteractionResult.SUCCESS;
                 }
             }
         }
 
+        // --- FILL with MILK BUCKET (vanilla milk isn't a BucketItem) ---
+        if (stack.is(Items.MILK_BUCKET)) {
+            Fluid milk = findMilkFluid(level);
+            if (milk != Fluids.EMPTY) {
+                int filled = handlerColumn.fill(new net.neoforged.neoforge.fluids.FluidStack(milk, 1000),
+                        IFluidHandler.FluidAction.EXECUTE);
+                if (filled == 1000) {
+                    if (!player.isCreative()) player.setItemInHand(hand, new ItemStack(Items.BUCKET));
+                    level.playSound(null, pos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
+                    be.setChanged();
+                    level.sendBlockUpdated(pos, state, state, 3);
+                    level.invalidateCapabilities(pos);
+                    return InteractionResult.SUCCESS;
+                }
+            }
+            // If no milk fluid is registered by any mod, do nothing (PASS).
+        }
+
         // --- DRAIN with empty bucket ---
         if (stack.getItem() == Items.BUCKET) {
-            FluidStack drained = handler.drain(1000, IFluidHandler.FluidAction.EXECUTE);
-            if (!drained.isEmpty()) {
-                Item resultBucket = bucketFor(drained);
-                if (!player.isCreative()) {
-                    player.setItemInHand(hand, new ItemStack(resultBucket));
-                }
-                level.playSound(null, pos, SoundEvents.BUCKET_FILL, SoundSource.BLOCKS, 1.0F, 1.0F);
+            FluidStack drained = handlerColumn.drain(1000, IFluidHandler.FluidAction.EXECUTE);
+            if (!drained.isEmpty() && drained.getAmount() == 1000) {
+                Item resultBucket = bucketFor(level, drained);
+                if (!player.isCreative()) player.setItemInHand(hand, new ItemStack(resultBucket));
+                level.playSound(null, pos,
+                        drained.getFluid().isSame(Fluids.LAVA) ? SoundEvents.BUCKET_FILL_LAVA : SoundEvents.BUCKET_FILL,
+                        SoundSource.BLOCKS, 1.0F, 1.0F);
                 be.setChanged();
                 level.sendBlockUpdated(pos, state, state, 3);
-                // 👇 Ensure visuals sync after draining
-                level.sendBlockUpdated(pos, state, state, 3);
-                level.invalidateCapabilities(pos); // optional: re-sync fluid caps if needed
+                level.invalidateCapabilities(pos);
                 return InteractionResult.SUCCESS;
             }
         }
@@ -153,8 +200,8 @@ public class TankBlock extends Block implements EntityBlock {
         return InteractionResult.PASS;
     }
 
-    /** Chooses correct bucket item for drained fluid. */
-    private static Item bucketFor(FluidStack fs) {
+    /** Chooses correct bucket item for drained fluid (now includes milk if present). */
+    private static Item bucketFor(Level level, FluidStack fs) {
         Fluid f = fs.getFluid();
 
         // BuildCraft fluids
@@ -163,51 +210,59 @@ public class TankBlock extends Block implements EntityBlock {
 
         // Vanilla
         if (f.isSame(Fluids.WATER) || f.isSame(Fluids.FLOWING_WATER)) return Items.WATER_BUCKET;
-        if (f.isSame(Fluids.LAVA) || f.isSame(Fluids.FLOWING_LAVA)) return Items.LAVA_BUCKET;
+        if (f.isSame(Fluids.LAVA)  || f.isSame(Fluids.FLOWING_LAVA))  return Items.LAVA_BUCKET;
+
+        // Milk (from any mod registering a milk fluid)
+        Fluid milk = findMilkFluid(level);
+        if (milk != Fluids.EMPTY && f.isSame(milk)) return Items.MILK_BUCKET;
 
         // Fallback
         return Items.BUCKET;
     }
 
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
-                                               Player player, BlockHitResult hit) {
-        return InteractionResult.PASS;
+    /* -------- Milk helpers -------- */
+
+    /**
+     * Tries to resolve a "milk" Fluid from common IDs used by mods / NeoForge.
+     * If none is present, returns Fluids.EMPTY (and milk buckets won't be accepted).
+     */
+    private static Fluid findMilkFluid(Level level) {
+        try {
+            var reg = level.registryAccess().lookupOrThrow(Registries.FLUID);
+            // Try common names in order of likelihood
+            ResourceLocation[] candidates = new ResourceLocation[] {
+                    ResourceLocation.parse("neoforge:milk"),
+                    ResourceLocation.parse("forge:milk"),
+                    ResourceLocation.parse("create:milk"),
+                    ResourceLocation.parse("minecraft:milk") // just in case some pack adds it
+            };
+            for (ResourceLocation rl : candidates) {
+                var opt = reg.get(rl);
+                if (opt.isPresent()) {
+                    Fluid f = opt.get().value();
+                    if (f != null && f != Fluids.EMPTY) return f;
+                }
+            }
+        } catch (Exception ignored) {}
+        return Fluids.EMPTY;
     }
 
     /* -------- Shapes / rendering -------- */
 
-    @Override
-    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return SOLID_SHAPE;
-    }
+    @Override protected VoxelShape getShape(BlockState s, BlockGetter l, BlockPos p, CollisionContext c) { return SOLID_SHAPE; }
+    @Override protected VoxelShape getCollisionShape(BlockState s, BlockGetter l, BlockPos p, CollisionContext c) { return SOLID_SHAPE; }
+    @Override protected VoxelShape getBlockSupportShape(BlockState s, BlockGetter l, BlockPos p) { return SOLID_SHAPE; }
+    @Override protected VoxelShape getInteractionShape(BlockState s, BlockGetter l, BlockPos p) { return SOLID_SHAPE; }
 
-    @Override
-    protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return SOLID_SHAPE;
-    }
-
-    @Override
-    protected VoxelShape getBlockSupportShape(BlockState state, BlockGetter level, BlockPos pos) {
-        return SOLID_SHAPE;
-    }
-
-    @Override
-    protected VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos) {
-        return SOLID_SHAPE;
-    }
-
-    /** Hide top/bottom faces when stacked to make glass columns look continuous. */
+    /** Hide faces only when actually joined (so red ring shows at mixed seams). */
     @Override
     protected boolean skipRendering(BlockState thisState, BlockState otherState, Direction side) {
         if (otherState.getBlock() instanceof TankBlock && side.getAxis() == Direction.Axis.Y) {
-            return true;
+            if (side == Direction.UP)   return thisState.getValue(JOINED_ABOVE);
+            if (side == Direction.DOWN) return thisState.getValue(JOINED_BELOW);
         }
         return super.skipRendering(thisState, otherState, side);
     }
 
-    @Override
-    protected RenderShape getRenderShape(BlockState state) {
-        return RenderShape.MODEL;
-    }
+    @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 }

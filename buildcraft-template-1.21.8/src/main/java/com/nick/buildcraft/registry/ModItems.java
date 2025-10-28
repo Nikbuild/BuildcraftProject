@@ -13,17 +13,14 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class ModItems {
     private ModItems() {}
 
-    // === Deferred Register ===
     public static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(BuildCraft.MODID);
 
     /* ---------- Block Items ---------- */
 
-    // Quarry
     public static final DeferredItem<BlockItem> QUARRY_CONTROLLER_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_quarry_controller", ModBlocks.QUARRY_CONTROLLER);
 
-    // Engines
     public static final DeferredItem<BlockItem> MODEL_ITEM_REDSTONE_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_redstone_engine", ModBlocks.REDSTONE_ENGINE);
     public static final DeferredItem<BlockItem> MODEL_ITEM_STIRLING_ENGINE =
@@ -31,7 +28,6 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);
 
-    // Pipes
     public static final DeferredItem<BlockItem> STONE_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("stone_pipe", ModBlocks.STONE_PIPE);
     public static final DeferredItem<BlockItem> COBBLE_PIPE_ITEM =
@@ -45,11 +41,14 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> WOOD_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("wood_pipe", ModBlocks.WOOD_PIPE);
 
-    // Tank (NEW)
     public static final DeferredItem<BlockItem> TANK_ITEM =
-            ITEMS.registerSimpleBlockItem("model_items_tank", ModBlocks.TANK); // <-- CHANGED
+            ITEMS.registerSimpleBlockItem("model_items_tank", ModBlocks.TANK);
 
-    // (No frame item; frames are placed by quarry itself)
+    // IMPORTANT: item id must be "mining_well" to match models/item/mining_well.json
+    public static final DeferredItem<BlockItem> MINING_WELL_ITEM =
+            ITEMS.registerSimpleBlockItem("mining_well", ModBlocks.MINING_WELL);
+
+    // NOTE: no BlockItem for mining_pipe (there is no item JSON; pipe is placed by the well)
 
     /* ---------- Gear Items ---------- */
 

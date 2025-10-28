@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "buildcraft:block/miningpipe/mining_pipe" }
+  }
+}

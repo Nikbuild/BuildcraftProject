@@ -5,11 +5,13 @@ import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
+import com.nick.buildcraft.content.block.miningwell.MiningPipeBlock;     // NEW
+import com.nick.buildcraft.content.block.miningwell.MiningWellBlock;    // NEW
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
 import com.nick.buildcraft.content.block.quarry.QuarryBlock;
-import com.nick.buildcraft.content.block.tank.TankBlock; // <-- NEW
+import com.nick.buildcraft.content.block.tank.TankBlock;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -194,7 +196,7 @@ public final class ModBlocks {
 
     /** Fluid Tank block */
     public static final DeferredBlock<Block> TANK = BLOCKS.register(
-            "blockstate_tank", // <-- CHANGED
+            "blockstate_tank",
             () -> new TankBlock(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
@@ -203,7 +205,36 @@ public final class ModBlocks {
                             .requiresCorrectToolForDrops()
                             .setId(ResourceKey.create(
                                     Registries.BLOCK,
-                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_tank") // <-- CHANGED
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "blockstate_tank")
+                            ))
+            )
+    );
+
+    /* -------- Mining Well + Pipe -------- */
+    // IMPORTANT: id must be "mining_well" to match blockstates/mining_well.json and models
+    public static final DeferredBlock<Block> MINING_WELL = BLOCKS.register(
+            "mining_well",
+            () -> new MiningWellBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .strength(3.0F, 6.0F)
+                            .requiresCorrectToolForDrops()
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "mining_well")
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> MINING_PIPE = BLOCKS.register(
+            "mining_pipe",
+            () -> new MiningPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .noOcclusion()
+                            .strength(1.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "mining_pipe")
                             ))
             )
     );

@@ -45,6 +45,12 @@ public final class ModFluids {
     public static final ResourceLocation FUEL_FLOW  =
             ResourceLocation.fromNamespaceAndPath(BuildCraft.MODID, "block/fluids/fuel_light_heat_0_flow");
 
+    // For milk we intentionally reuse vanilla water textures so we don't need to ship any.
+    private static final ResourceLocation WATER_STILL =
+            ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still");
+    private static final ResourceLocation WATER_FLOW  =
+            ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow");
+
     /* =========================================================
        OIL
        ========================================================= */
@@ -145,6 +151,40 @@ public final class ModFluids {
                 .tickRate(5);
     }
 
+    /* =========================================================
+       MILK (internal-only, non-placeable, no bucket item)
+       ========================================================= */
+    public static final DeferredHolder<FluidType, FluidType> MILK_TYPE =
+            FLUID_TYPES.register("milk", () ->
+                    new FluidType(FluidType.Properties.create()
+                            .viscosity(1500)
+                            .density(1030)
+                            .temperature(295)
+                            .canSwim(true)
+                            .supportsBoating(true)
+                            .fallDistanceModifier(0.9f)));
+
+    public static final DeferredHolder<Fluid, FlowingFluid> MILK =
+            FLUIDS.register("milk", () -> new BaseFlowingFluid.Source(milkProps()));
+    public static final DeferredHolder<Fluid, FlowingFluid> FLOWING_MILK =
+            FLUIDS.register("flowing_milk", () -> new BaseFlowingFluid.Flowing(milkProps()));
+
+    /**
+     * NOTE: No .bucket(...) and no .block(...) calls here → not placeable in-world
+     * and no auto-generated bucket item. We translate to/from Items.MILK_BUCKET
+     * inside TankBlock's interaction code.
+     */
+    private static BaseFlowingFluid.Properties milkProps() {
+        return new BaseFlowingFluid.Properties(
+                MILK_TYPE::get,
+                MILK::get,
+                FLOWING_MILK::get
+        )
+                .levelDecreasePerBlock(1)
+                .slopeFindDistance(2)
+                .tickRate(5);
+    }
+
     /* ---------------- Register hook ---------------- */
     public static void register(IEventBus modEventBus) {
         FLUID_TYPES.register(modEventBus);
@@ -166,6 +206,13 @@ public final class ModFluids {
             @Override public ResourceLocation getStillTexture()   { return FUEL_STILL; }
             @Override public ResourceLocation getFlowingTexture() { return FUEL_FLOW; }
         }, FUEL_TYPE.get());
+
+        // Milk → reuse water textures (renderer tints to white, so this is fine)
+        event.registerFluidType(new IClientFluidTypeExtensions() {
+            @Override public ResourceLocation getStillTexture()   { return WATER_STILL; }
+            @Override public ResourceLocation getFlowingTexture() { return WATER_FLOW; }
+            // If your NeoForge version supports tint here, you could return 0xFFFFFFFF to force white.
+        }, MILK_TYPE.get());
     }
 
     /* ---------------- Engine-facing energy metadata ---------------- */

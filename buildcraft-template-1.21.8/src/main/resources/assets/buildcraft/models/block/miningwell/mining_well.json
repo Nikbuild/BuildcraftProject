@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "buildcraft:block/miningwell/miningwell_side",
+    "down":     "buildcraft:block/miningwell/miningwell_back",
+    "up":       "buildcraft:block/miningwell/miningwell_top",
+    "north":    "buildcraft:block/miningwell/miningwell_front",
+    "south":    "buildcraft:block/miningwell/miningwell_back",
+    "east":     "buildcraft:block/miningwell/miningwell_side",
+    "west":     "buildcraft:block/miningwell/miningwell_side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to":   [16, 16, 16],
+      "faces": {
+        "down":  { "texture": "#down",  "cullface": "down"  },
+        "up":    { "texture": "#up",    "cullface": "up"    },
+        "north": { "texture": "#north" },
+        "south": { "texture": "#south" },
+        "east":  { "texture": "#east"  },
+        "west":  { "texture": "#west"  }
+      }
+    }
+  ]
+}

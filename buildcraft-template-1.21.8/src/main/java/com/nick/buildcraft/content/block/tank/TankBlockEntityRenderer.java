@@ -12,16 +12,18 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.joml.Matrix4f;
 
 /**
- * Continuous fluid column renderer: draws fluid as one seamless volume spanning all connected tanks.
- * Supports water, lava, oil, and fuel with correct coloring and instant first-fill visibility.
+ * Renders the tank column as per-block slices (one slice per BE's FluidTank).
+ * Only blocks that actually hold fluid render in their 1-block vertical band.
  */
 public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEntity> {
 
@@ -33,7 +35,6 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
     private static final float WALL_EPS = 0.0008f;
     private static final float FLOOR_CEIL_EPS = 0.0012f;
     private static final float MIN_SLICE_THICKNESS = 0.0025f;
-    private static final float FLUID_VERTICAL_OFFSET = 1f / 16f; // slight lift for floating surface
 
     public TankBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {}
 
@@ -49,23 +50,27 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
         Level level = be.getLevel();
         if (level == null) return;
 
-        // Only render from the *bottommost* tank in the stack
+        // Only the *bottommost* BE in a column issues draw calls
         TankBlockEntity.ColumnInfo col = TankBlockEntity.scanColumn(level, be.getBlockPos());
-        if (col == null || col.size <= 0 || col.totalAmount <= 0) return;
-        if (be.columnIndex() != 0) return; // skip upper tanks
+        if (col == null || col.size <= 0) return;
+        if (be.columnIndex() != 0) return;
 
-        FluidStack fluid = col.representativeFluid;
-        if (fluid.isEmpty()) return;
+        FluidStack rep = col.representativeFluid;
+        if (rep.isEmpty()) return;
 
-        // --- Choose correct texture ---
-        ResourceLocation spriteLoc;
-        if (fluid.getFluid() == ModFluids.OIL.get() || fluid.getFluid() == ModFluids.FLOWING_OIL.get()) {
+        // Resolve milk once
+        Fluid milk = findMilkFluid(level);
+
+        // Choose the atlas sprite from the representative fluid
+        final ResourceLocation spriteLoc;
+        if (rep.getFluid() == ModFluids.OIL.get() || rep.getFluid() == ModFluids.FLOWING_OIL.get()) {
             spriteLoc = ModFluids.OIL_STILL;
-        } else if (fluid.getFluid() == ModFluids.FUEL.get() || fluid.getFluid() == ModFluids.FLOWING_FUEL.get()) {
+        } else if (rep.getFluid() == ModFluids.FUEL.get() || rep.getFluid() == ModFluids.FLOWING_FUEL.get()) {
             spriteLoc = ModFluids.FUEL_STILL;
-        } else if (fluid.getFluid() == Fluids.LAVA || fluid.getFluid() == Fluids.FLOWING_LAVA) {
+        } else if (rep.getFluid() == Fluids.LAVA || rep.getFluid() == Fluids.FLOWING_LAVA) {
             spriteLoc = LAVA_SPRITE;
         } else {
+            // Fallback for water-like fluids (also fine for milk if no custom still tex)
             spriteLoc = WATER_SPRITE;
         }
 
@@ -74,55 +79,65 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
                 .getAtlas(TextureAtlas.LOCATION_BLOCKS)
                 .getSprite(spriteLoc);
 
-        // --- Compute fluid height ---
-        float totalFraction = (float) col.totalAmount / (float) col.totalCapacity();
-        float globalHeight = totalFraction * col.size;
-        if (globalHeight <= 0f) return;
-
-        // Tank interior bounds
-        float x0 = 1f / 16f + WALL_EPS, x1 = 15f / 16f - WALL_EPS;
-        float z0 = 1f / 16f + WALL_EPS, z1 = 15f / 16f - WALL_EPS;
-        // vertical bounds – adjusted so very small amounts still render
-        float y0 = 0f + FLOOR_CEIL_EPS;
-        float y1 = Math.max(y0 + MIN_SLICE_THICKNESS,
-                Math.min(globalHeight, col.size) - FLOOR_CEIL_EPS);
-
-        if (y1 <= y0) return;
-
-
-
-        // --- Tint ---
-        int rgb;
-        if (fluid.getFluid() == ModFluids.OIL.get() || fluid.getFluid() == ModFluids.FUEL.get()) {
-            rgb = 0xFFFFFF; // no tint
-        } else if (fluid.getFluid() == Fluids.LAVA || fluid.getFluid() == Fluids.FLOWING_LAVA) {
-            rgb = 0xFF6000; // warm lava tint
-        } else {
-            rgb = BiomeColors.getAverageWaterColor(level, be.getBlockPos());
-        }
-
-        int r = (rgb >> 16) & 0xFF;
-        int g = (rgb >> 8) & 0xFF;
-        int b = rgb & 0xFF;
-        int a = 210; // slightly more opaque than before
+        // Interior XY bounds in a single block
+        final float x0 = 1f / 16f + WALL_EPS, x1 = 15f / 16f - WALL_EPS;
+        final float z0 = 1f / 16f + WALL_EPS, z1 = 15f / 16f - WALL_EPS;
 
         pose.pushPose();
         VertexConsumer vc = buffers.getBuffer(RenderType.entityTranslucent(TextureAtlas.LOCATION_BLOCKS));
         Matrix4f mat = pose.last().pose();
 
-        // --- Draw one seamless prism ---
-        putFlatQuadTop(vc, mat, x0, x1, z0, z1, y1, sprite, packedLight, packedOverlay, r, g, b, a);
-        putFlatQuadBottom(vc, mat, x0, x1, z0, z1, y0, sprite, packedLight, packedOverlay, r, g, b, a);
-        putFlatQuadNorth(vc, mat, x0, x1, y0, y1, z0, sprite, packedLight, packedOverlay, r, g, b, a);
-        putFlatQuadSouth(vc, mat, x0, x1, y0, y1, z1, sprite, packedLight, packedOverlay, r, g, b, a);
-        putFlatQuadWest(vc, mat, z0, z1, y0, y1, x0, sprite, packedLight, packedOverlay, r, g, b, a);
-        putFlatQuadEast(vc, mat, z0, z1, y0, y1, x1, sprite, packedLight, packedOverlay, r, g, b, a);
+        // Walk bottom->up; for each BE, render only what's inside that BE's tank.
+        BlockPos p = col.bottom;
+        for (int i = 0; i < col.size; i++) {
+            var curBe = level.getBlockEntity(p);
+            if (!(curBe instanceof TankBlockEntity tbe)) break;
+
+            FluidStack fs = tbe.getTank().getFluid();
+            if (fs.isEmpty()) { // empty tank => no slice
+                p = p.above();
+                continue;
+            }
+
+            // Stop at a "barrier" (different fluid); we never render across
+            if (!FluidStack.isSameFluidSameComponents(rep, fs)) break;
+
+            // Local vertical band [i, i+1) in the column's local coordinates
+            float localBase = (float) (p.getY() - col.bottom.getY());
+            float frac = (float) fs.getAmount() / (float) TankBlockEntity.CAPACITY;
+            if (frac <= 0f) { p = p.above(); continue; }
+
+            float y0 = localBase + FLOOR_CEIL_EPS;
+            float y1 = localBase + Math.min(1f - FLOOR_CEIL_EPS, Math.max(frac, MIN_SLICE_THICKNESS));
+
+            // Per-block tinting
+            final int rgb;
+            if (rep.getFluid() == Fluids.LAVA || rep.getFluid() == Fluids.FLOWING_LAVA) {
+                rgb = 0xFF6000;                     // lava orange
+            } else if (rep.getFluid() == ModFluids.OIL.get() || rep.getFluid() == ModFluids.FUEL.get()) {
+                rgb = 0xFFFFFF;                     // no tint for our custom fluids (already colored)
+            } else if (milk != Fluids.EMPTY && rep.getFluid().isSame(milk)) {
+                rgb = 0xFFFFFF;                     // milk → white (not biome-tinted blue)
+            } else {
+                rgb = BiomeColors.getAverageWaterColor(level, p); // water and waterlikes
+            }
+            int r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF, a = 210;
+
+            // Draw this tank's slice
+            putFlatQuadTop   (vc, mat, x0, x1, z0, z1, y1, sprite, packedLight, packedOverlay, r,g,b,a);
+            putFlatQuadBottom(vc, mat, x0, x1, z0, z1, y0, sprite, packedLight, packedOverlay, r,g,b,a);
+            putFlatQuadNorth (vc, mat, x0, x1, y0, y1, z0, sprite, packedLight, packedOverlay, r,g,b,a);
+            putFlatQuadSouth (vc, mat, x0, x1, y0, y1, z1, sprite, packedLight, packedOverlay, r,g,b,a);
+            putFlatQuadWest  (vc, mat, z0, z1, y0, y1, x0, sprite, packedLight, packedOverlay, r,g,b,a);
+            putFlatQuadEast  (vc, mat, z0, z1, y0, y1, x1, sprite, packedLight, packedOverlay, r,g,b,a);
+
+            p = p.above();
+        }
 
         pose.popPose();
     }
 
-    /* ---------- helpers ---------- */
-
+    /* ---------- quad helpers ---------- */
 
     private static void putFlatQuadTop(VertexConsumer vc, Matrix4f mat,
                                        float x0, float x1, float z0, float z1, float y,
@@ -193,9 +208,7 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
     @Override
     public AABB getRenderBoundingBox(TankBlockEntity blockEntity) {
         TankBlockEntity.ColumnInfo col = TankBlockEntity.scanColumn(blockEntity.getLevel(), blockEntity.getBlockPos());
-        if (col == null) {
-            return new AABB(blockEntity.getBlockPos());
-        }
+        if (col == null) return new AABB(blockEntity.getBlockPos());
 
         BlockPos bottom = col.bottom;
         return new AABB(
@@ -208,4 +221,25 @@ public class TankBlockEntityRenderer implements BlockEntityRenderer<TankBlockEnt
         ).inflate(0.1);
     }
 
+    /* -------- Milk helper (shared logic with block) -------- */
+
+    private static Fluid findMilkFluid(Level level) {
+        try {
+            var reg = level.registryAccess().lookupOrThrow(Registries.FLUID);
+            ResourceLocation[] candidates = new ResourceLocation[] {
+                    ResourceLocation.parse("neoforge:milk"),
+                    ResourceLocation.parse("forge:milk"),
+                    ResourceLocation.parse("create:milk"),
+                    ResourceLocation.parse("minecraft:milk")
+            };
+            for (ResourceLocation rl : candidates) {
+                var opt = reg.get(rl);
+                if (opt.isPresent()) {
+                    Fluid f = opt.get().value();
+                    if (f != null && f != Fluids.EMPTY) return f;
+                }
+            }
+        } catch (Exception ignored) {}
+        return Fluids.EMPTY;
+    }
 }

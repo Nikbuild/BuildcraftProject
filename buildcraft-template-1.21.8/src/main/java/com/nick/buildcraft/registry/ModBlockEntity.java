@@ -1,4 +1,3 @@
-// src/main/java/com/nick/buildcraft/registry/ModBlockEntity.java
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
@@ -8,11 +7,12 @@ import com.nick.buildcraft.content.block.engine.EngineRingMovingBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineType;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlockEntity;
+import com.nick.buildcraft.content.block.miningwell.MiningWellBlockEntity;   // NEW
 import com.nick.buildcraft.content.block.pipe.DiamondPipeBlock;
 import com.nick.buildcraft.content.block.pipe.DiamondPipeBlockEntity;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
-import com.nick.buildcraft.content.block.tank.TankBlockEntity; // ← NEW
+import com.nick.buildcraft.content.block.tank.TankBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -98,6 +98,14 @@ public final class ModBlockEntity {
                     () -> new BlockEntityType<>(
                             TankBlockEntity::new,
                             Set.of(ModBlocks.TANK.get()))
+            );
+
+    /** Mining Well block entity registration */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MiningWellBlockEntity>> MINING_WELL =
+            BLOCK_ENTITY_TYPES.register("mining_well",
+                    () -> new BlockEntityType<>(
+                            MiningWellBlockEntity::new,
+                            Set.of(ModBlocks.MINING_WELL.get()))
             );
 
     private ModBlockEntity() {}

@@ -4,10 +4,10 @@ import com.mojang.logging.LogUtils;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModBlocks;
 import com.nick.buildcraft.registry.ModEntities;
-import com.nick.buildcraft.registry.ModFeatures;      // ← ADD
-import com.nick.buildcraft.registry.ModFluids;        // fluids
+import com.nick.buildcraft.registry.ModFeatures;
+import com.nick.buildcraft.registry.ModFluids;
 import com.nick.buildcraft.registry.ModItems;
-import com.nick.buildcraft.registry.ModMenus;         // menus
+import com.nick.buildcraft.registry.ModMenus;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -19,7 +19,6 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
@@ -49,6 +48,9 @@ public class BuildCraft {
                                 out.accept(ModItems.GOLD_PIPE_ITEM.get());
                                 out.accept(ModItems.DIAMOND_PIPE_ITEM.get());
 
+                                // Mining Well (pipe has no item)
+                                out.accept(ModItems.MINING_WELL_ITEM.get());
+
                                 // Engines
                                 out.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE.get());
                                 out.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE.get());
@@ -73,24 +75,20 @@ public class BuildCraft {
             );
 
     public BuildCraft(IEventBus modEventBus, ModContainer modContainer) {
-        // lifecycle listeners
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
 
-        // registries
         ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModBlockEntity.BLOCK_ENTITIES.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
         ModMenus.MENUS.register(modEventBus);
         ModFluids.register(modEventBus);
-        ModFeatures.FEATURES.register(modEventBus);   // ← ADD: features (oil spout)
+        ModFeatures.FEATURES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
 
-        // config
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        // game (NeoForge) event bus — register handlers explicitly
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
     }
 
@@ -108,6 +106,9 @@ public class BuildCraft {
             event.accept(ModItems.IRON_PIPE_ITEM);
             event.accept(ModItems.GOLD_PIPE_ITEM);
             event.accept(ModItems.DIAMOND_PIPE_ITEM);
+
+            // Mining Well only
+            event.accept(ModItems.MINING_WELL_ITEM);
 
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
             event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);
@@ -131,7 +132,7 @@ public class BuildCraft {
         }
     }
 
-    private void onServerStarting(ServerStartingEvent event) {
+    private void onServerStarting(net.neoforged.neoforge.event.server.ServerStartingEvent event) {
         LOGGER.info("BuildCraft server starting");
     }
 }

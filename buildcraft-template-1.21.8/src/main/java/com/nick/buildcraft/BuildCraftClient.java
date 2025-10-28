@@ -2,10 +2,11 @@ package com.nick.buildcraft;
 
 import com.nick.buildcraft.client.render.EngineRenderer;
 import com.nick.buildcraft.client.render.LaserEntityRenderer;
+import com.nick.buildcraft.client.render.MiningWellRenderer;     // ← NEW
 import com.nick.buildcraft.client.render.QuarryRenderer;
 import com.nick.buildcraft.client.render.StonePipeRenderer;
-import com.nick.buildcraft.client.screen.StirlingEngineScreen;
 import com.nick.buildcraft.client.screen.DiamondPipeScreen;
+import com.nick.buildcraft.client.screen.StirlingEngineScreen;
 import com.nick.buildcraft.content.block.tank.TankBlockEntityRenderer;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModBlocks;
@@ -44,11 +45,12 @@ public final class BuildCraftClient {
                 : "<unknown>";
         BuildCraft.LOGGER.info("Logged-in player (client): {}", user);
 
-        // --- Added from working client ---
-        // Ensure transparent and glassy models render correctly
         event.enqueueWork(() -> {
             // Tank uses cutout (bars + holes); fluid itself is drawn as translucent by BER
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.TANK.get(), ChunkSectionLayer.CUTOUT);
+
+            // Mining Pipe is a skinny column model (cutout)
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.MINING_PIPE.get(), ChunkSectionLayer.CUTOUT);
         });
     }
 
@@ -64,13 +66,13 @@ public final class BuildCraftClient {
         event.registerBlockEntityRenderer(ModBlockEntity.QUARRY_CONTROLLER.get(), QuarryRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntity.STONE_PIPE.get(), StonePipeRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntity.ENGINE.get(), EngineRenderer::new);
-
-        // --- Added from working client ---
-        // Register tank’s block entity renderer (renders fluid cap)
         event.registerBlockEntityRenderer(ModBlockEntity.TANK.get(), TankBlockEntityRenderer::new);
+
+        // NEW: Mining Well BER (off-screen rendering + tall AABB handled inside)
+        event.registerBlockEntityRenderer(ModBlockEntity.MINING_WELL.get(), MiningWellRenderer::new);
     }
 
-    // --- Attach fluid textures via client extensions ---
+    // Attach fluid textures via client extensions
     @SubscribeEvent
     static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
         // Oil

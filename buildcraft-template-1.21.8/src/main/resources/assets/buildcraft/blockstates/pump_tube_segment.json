@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "buildcraft:block/pump/pump_tube_segment" }
+  }
+}

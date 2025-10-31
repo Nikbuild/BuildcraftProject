@@ -38,6 +38,7 @@ public class BuildCraft {
                             .withTabsBefore(CreativeModeTabs.COMBAT)
                             .icon(() -> ModItems.QUARRY_CONTROLLER_ITEM.get().getDefaultInstance())
                             .displayItems((params, out) -> {
+                                // Machines
                                 out.accept(ModItems.QUARRY_CONTROLLER_ITEM.get());
 
                                 // Pipes
@@ -50,6 +51,9 @@ public class BuildCraft {
 
                                 // Mining Well (pipe has no item)
                                 out.accept(ModItems.MINING_WELL_ITEM.get());
+
+                                // Pump (new addition)
+                                out.accept(ModItems.PUMP_ITEM.get());
 
                                 // Engines
                                 out.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE.get());
@@ -109,6 +113,9 @@ public class BuildCraft {
 
             // Mining Well only
             event.accept(ModItems.MINING_WELL_ITEM);
+
+            // Pump also appears in building blocks
+            event.accept(ModItems.PUMP_ITEM);
 
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
             event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);

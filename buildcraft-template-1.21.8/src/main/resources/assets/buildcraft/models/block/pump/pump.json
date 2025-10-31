@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "buildcraft:block/pump/pump_side",
+    "down": "buildcraft:block/pump/pump_bottom",
+    "up": "buildcraft:block/pump/pump_top",
+    "north": "buildcraft:block/pump/pump_side",
+    "south": "buildcraft:block/pump/pump_side",
+    "west": "buildcraft:block/pump/pump_side",
+    "east": "buildcraft:block/pump/pump_side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down":  { "texture": "#down",  "cullface": "down" },
+        "up":    { "texture": "#up",    "cullface": "up" },
+        "north": { "texture": "#north" },
+        "south": { "texture": "#south" },
+        "west":  { "texture": "#west" },
+        "east":  { "texture": "#east" }
+      }
+    }
+  ]
+}

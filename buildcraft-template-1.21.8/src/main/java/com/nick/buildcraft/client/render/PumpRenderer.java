@@ -10,19 +10,22 @@ import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Renders the pump's suction hose as a vertical stack of the baked model
- * pump_tube_segment, perfectly centered under the pump block.
+ * Animated pump hose renderer (no client-side easing).
  *
- * Notes:
- * - We do NOT subtract camPos. The pose we get is already positioned at
- *   (pumpPos - cameraPos), same as QuarryRenderer.
- * - Each segment is drawn as if it lives in the block directly below the pump,
- *   so visually the hose is a straight column down from the center of the pump.
+ * We draw the hose as if it's being extruded out of the pump head:
+ *  - A partial-height slice directly under the pump block,
+ *  - Then whole 1-block segments below that.
+ *
+ * We use the server-synced fractional hose tip Y (tubeHeadYExact),
+ * so visual speed matches server payout speed from the first tick of power.
+ *
+ * pose starts with (0,0,0) == pumpPos in camera-space.
  */
 public class PumpRenderer implements BlockEntityRenderer<PumpBlockEntity> {
 
@@ -40,46 +43,51 @@ public class PumpRenderer implements BlockEntityRenderer<PumpBlockEntity> {
             MultiBufferSource buffers,
             int packedLight,
             int packedOverlay,
-            Vec3 camPos // provided by MC, but we don't manually use it
+            Vec3 camPos
     ) {
         Level level = be.getLevel();
         if (level == null || be.isRemoved()) return;
 
-        // animated bottom of hose
-        Integer hoseTipY = be.getTubeRenderY();
-        if (hoseTipY == null) return;
+        // server-authoritative smooth tip Y. null => hose not deployed yet
+        Double tipYExactD = be.getTubeRenderYExact();
+        if (tipYExactD == null) return;
 
         BlockPos pumpPos = be.getBlockPos();
         int pumpY = pumpPos.getY();
-        int tipY  = hoseTipY;
+        double tipYExact = tipYExactD;
 
-        // only draw if it's actually below the pump
-        if (tipY >= pumpY) return;
+        // don't draw if the tip isn't actually below pump
+        if (tipYExact >= pumpY - 1e-6) return;
 
-        // we'll render from just under the pump down to just above the tip
-        int startY = pumpY - 1;
-        int endY   = tipY + 1;
-        if (endY > startY) return;
+        // hose length in blocks = pumpY - tipYExact
+        double lengthBlocksExact = pumpY - tipYExact;
+        if (lengthBlocksExact <= 1.0e-6) return;
 
-        // baked skinny tube blockstate
+        // split length into [partial slice just under pump] + [full blocks]
+        int fullCount = Mth.floor(lengthBlocksExact);       // whole segments
+        double partialFrac = lengthBlocksExact - fullCount; // 0.. <1 of a segment right under pump
+
         var tubeState = ModBlocks.PUMP_TUBE_SEGMENT.get().defaultBlockState();
 
-        // pose is already translated so that (0,0,0) == pumpPos in camera space.
-        // So translating by (0, dy, 0) moves to world y = pumpY + dy.
-        for (int y = startY; y >= endY; y--) {
-            int dy = y - pumpY;
+        // ---------- 1) partial slice (if any) ----------
+        if (partialFrac > 1.0e-6) {
+            double sliceHeight = partialFrac;
+            double sliceBottomY = pumpY - sliceHeight;
 
-            // lighting for this segment at its actual world position
-            BlockPos segWorldPos = new BlockPos(pumpPos.getX(), y, pumpPos.getZ());
-            int segLight = LevelRenderer.getLightColor(level, segWorldPos);
+            BlockPos lightPos = new BlockPos(
+                    pumpPos.getX(),
+                    Mth.floor(sliceBottomY),
+                    pumpPos.getZ()
+            );
+            int segLight = LevelRenderer.getLightColor(level, lightPos);
 
             pose.pushPose();
+            // pose origin y=0 == pumpY in world.
+            // We want local y=0 to sit at world sliceBottomY.
+            pose.translate(0.0, sliceBottomY - pumpY, 0.0);
 
-            // OLD (off-center):
-            // pose.translate(-0.5, dy, -0.5);
-            //
-            // NEW (centered under the pump X/Z):
-            pose.translate(0.0, dy, 0.0);
+            // scale Y down to sliceHeight so the cube occupies [0..sliceHeight]
+            pose.scale(1.0f, (float) sliceHeight, 1.0f);
 
             brd.renderSingleBlock(
                     tubeState,
@@ -88,12 +96,38 @@ public class PumpRenderer implements BlockEntityRenderer<PumpBlockEntity> {
                     segLight,
                     packedOverlay
             );
+            pose.popPose();
+        }
 
+        // ---------- 2) full 1-block segments below ----------
+        for (int i = 0; i < fullCount; i++) {
+            double offsetDownStart = partialFrac + i;
+
+            double worldTopY    = pumpY - offsetDownStart;
+            double worldBottomY = worldTopY - 1.0;
+
+            BlockPos segLightPos = new BlockPos(
+                    pumpPos.getX(),
+                    Mth.floor(worldBottomY),
+                    pumpPos.getZ()
+            );
+            int segLight = LevelRenderer.getLightColor(level, segLightPos);
+
+            pose.pushPose();
+            // local y=0 should sit at worldBottomY
+            pose.translate(0.0, worldBottomY - pumpY, 0.0);
+
+            // render full cube unscaled
+            brd.renderSingleBlock(
+                    tubeState,
+                    pose,
+                    buffers,
+                    segLight,
+                    packedOverlay
+            );
             pose.popPose();
         }
     }
-
-    /* ---------------- culling / bounds hints ---------------- */
 
     @Override
     public boolean shouldRenderOffScreen() {
@@ -116,7 +150,7 @@ public class PumpRenderer implements BlockEntityRenderer<PumpBlockEntity> {
         int minY = lvl.dimensionType().minY();
         int maxY = lvl.dimensionType().height() + minY;
 
-        // huge vertical column so the hose never gets frustum-culled early
+        // huge vertical column so we don't lose the hose to frustum culling
         return new AABB(
                 p.getX(), minY, p.getZ(),
                 p.getX() + 1, maxY, p.getZ() + 1

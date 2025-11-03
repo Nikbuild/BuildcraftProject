@@ -3,6 +3,7 @@ package com.nick.buildcraft;
 import com.mojang.logging.LogUtils;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModBlocks;
+import com.nick.buildcraft.registry.ModCapabilities;
 import com.nick.buildcraft.registry.ModEntities;
 import com.nick.buildcraft.registry.ModFeatures;
 import com.nick.buildcraft.registry.ModFluids;
@@ -41,7 +42,7 @@ public class BuildCraft {
                                 // Machines
                                 out.accept(ModItems.QUARRY_CONTROLLER_ITEM.get());
 
-                                // Pipes
+                                // Item Pipes
                                 out.accept(ModItems.STONE_PIPE_ITEM.get());
                                 out.accept(ModItems.COBBLE_PIPE_ITEM.get());
                                 out.accept(ModItems.WOOD_PIPE_ITEM.get());
@@ -49,10 +50,14 @@ public class BuildCraft {
                                 out.accept(ModItems.GOLD_PIPE_ITEM.get());
                                 out.accept(ModItems.DIAMOND_PIPE_ITEM.get());
 
-                                // Mining Well (pipe has no item)
+                                // Fluid Pipes
+                                out.accept(ModItems.STONE_FLUID_PIPE_ITEM.get());
+                                out.accept(ModItems.COBBLE_FLUID_PIPE_ITEM.get());
+
+                                // Mining Well (pipe segment has no separate item form)
                                 out.accept(ModItems.MINING_WELL_ITEM.get());
 
-                                // Pump (new addition)
+                                // Pump
                                 out.accept(ModItems.PUMP_ITEM.get());
 
                                 // Engines
@@ -60,9 +65,11 @@ public class BuildCraft {
                                 out.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE.get());
                                 out.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE.get());
 
+                                // Tank block item (storage / multiblock)
+                                out.accept(ModItems.TANK_ITEM.get());
+
                                 // Tools
                                 out.accept(ModItems.WRENCH);
-                                out.accept(ModItems.TANK_ITEM.get());
 
                                 // Fluids (buckets)
                                 out.accept(ModFluids.BUCKET_OIL.get());
@@ -91,6 +98,9 @@ public class BuildCraft {
         ModFeatures.FEATURES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
 
+        // NEW: attach capability registration (fluid/tank/pump/pipe/etc)
+        ModCapabilities.register(modEventBus);
+
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
@@ -104,6 +114,7 @@ public class BuildCraft {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(ModItems.QUARRY_CONTROLLER_ITEM);
 
+            // Item pipes
             event.accept(ModItems.STONE_PIPE_ITEM);
             event.accept(ModItems.COBBLE_PIPE_ITEM);
             event.accept(ModItems.WOOD_PIPE_ITEM);
@@ -111,16 +122,22 @@ public class BuildCraft {
             event.accept(ModItems.GOLD_PIPE_ITEM);
             event.accept(ModItems.DIAMOND_PIPE_ITEM);
 
-            // Mining Well only
+            // Fluid pipes
+            event.accept(ModItems.STONE_FLUID_PIPE_ITEM);
+            event.accept(ModItems.COBBLE_FLUID_PIPE_ITEM);
+
+            // Mining Well
             event.accept(ModItems.MINING_WELL_ITEM);
 
-            // Pump also appears in building blocks
+            // Pump
             event.accept(ModItems.PUMP_ITEM);
 
+            // Engines
             event.accept(ModItems.MODEL_ITEM_REDSTONE_ENGINE);
             event.accept(ModItems.MODEL_ITEM_STIRLING_ENGINE);
             event.accept(ModItems.MODEL_ITEM_COMBUSTION_ENGINE);
 
+            // Gears
             event.accept(ModItems.GEAR_WOOD);
             event.accept(ModItems.GEAR_STONE);
             event.accept(ModItems.GEAR_IRON);

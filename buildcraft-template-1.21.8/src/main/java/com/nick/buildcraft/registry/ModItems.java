@@ -13,9 +13,10 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * Item + block item registration.
  *
- * NOTE:
+ * NOTES:
  *  - MINING_PIPE has no item form (auto-placed by Mining Well).
- *  - Pump suction tube also has no item/block at all.
+ *  - PUMP_TUBE_SEGMENT also has no item; it's render-only.
+ *  - Each placeable block we actually want in inventories gets a BlockItem here.
  */
 public final class ModItems {
     private ModItems() {}
@@ -23,7 +24,7 @@ public final class ModItems {
     public static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(BuildCraft.MODID);
 
-    /* ---------- Block Items / machine display items ---------- */
+    /* ---------- Machine / block items shown in creative ---------- */
 
     public static final DeferredItem<BlockItem> QUARRY_CONTROLLER_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_quarry_controller", ModBlocks.QUARRY_CONTROLLER);
@@ -36,6 +37,8 @@ public final class ModItems {
 
     public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);
+
+    /* ---------- ITEM PIPES (items moving through pipes) ---------- */
 
     public static final DeferredItem<BlockItem> STONE_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("stone_pipe", ModBlocks.STONE_PIPE);
@@ -55,19 +58,27 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> WOOD_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("wood_pipe", ModBlocks.WOOD_PIPE);
 
+    /* ---------- FLUID PIPES (fluids moving through pipes) ---------- */
+    // each concrete fluid pipe block gets its own item form
+
+    public static final DeferredItem<BlockItem> STONE_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("stone_fluid_pipe", ModBlocks.STONE_FLUID_PIPE);
+
+    public static final DeferredItem<BlockItem> COBBLE_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("cobble_fluid_pipe", ModBlocks.COBBLE_FLUID_PIPE);
+
+    /* ---------- Storage / misc machines ---------- */
+
     public static final DeferredItem<BlockItem> TANK_ITEM =
             ITEMS.registerSimpleBlockItem("model_items_tank", ModBlocks.TANK);
 
-    // Mining Well controller
     public static final DeferredItem<BlockItem> MINING_WELL_ITEM =
             ITEMS.registerSimpleBlockItem("mining_well", ModBlocks.MINING_WELL);
 
-    // Pump block item
     public static final DeferredItem<BlockItem> PUMP_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_pump", ModBlocks.PUMP);
 
-
-    /* ---------- Gear Items ---------- */
+    /* ---------- Gears ---------- */
 
     public static final DeferredItem<Item> GEAR_WOOD =
             ITEMS.register("gear_wood",

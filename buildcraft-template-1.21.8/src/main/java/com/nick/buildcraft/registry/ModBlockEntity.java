@@ -7,6 +7,7 @@ import com.nick.buildcraft.content.block.engine.EngineRingMovingBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineType;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlockEntity;
+import com.nick.buildcraft.content.block.fluidpipe.FluidPipeBlockEntity;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlockEntity;
 import com.nick.buildcraft.content.block.pipe.DiamondPipeBlock;
 import com.nick.buildcraft.content.block.pipe.DiamondPipeBlockEntity;
@@ -25,17 +26,17 @@ import java.util.Set;
  * Central registry for all BuildCraft BlockEntityTypes.
  *
  * Notes:
- * - Some BlockEntityTypes are polymorphic (ENGINE, STONE_PIPE) and branch their factory
- *   based on the placed block's runtime class.
- * - Others are 1:1 with a single block (PUMP, TANK, QUARRY_CONTROLLER, etc).
+ * - Some BlockEntityTypes are polymorphic (ENGINE, STONE_PIPE, FLUID_PIPE) and branch their
+ *   factory based on which block is actually placed.
+ * - Others are 1:1 with a single block (PUMP, TANK, QUARRY_CONTROLLER, etc.).
  */
 public final class ModBlockEntity {
 
-    /** Neoforge deferred register backing all our BE types. */
+    /** NeoForge deferred register backing all our BlockEntityTypes. */
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, BuildCraft.MODID);
 
-    // Alias kept for backwards compatibility with old code that referred to BLOCK_ENTITIES.
+    // Backcompat alias
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = BLOCK_ENTITY_TYPES;
 
     /* --------------------------------------------------------------------- */
@@ -57,18 +58,17 @@ public final class ModBlockEntity {
             );
 
     /* --------------------------------------------------------------------- */
-    /* Pipes                                                                  */
+    /* Item Pipes                                                            */
     /* --------------------------------------------------------------------- */
 
     /**
-     * All pipe blocks share one BlockEntityType.
+     * All *item* pipe blocks share one BlockEntityType.
      *
-     * The factory returns:
+     * Factory returns:
      *  - DiamondPipeBlockEntity if the placed block is a DiamondPipeBlock
-     *  - StonePipeBlockEntity   for all other pipe blocks (stone, cobble, wood, etc.)
+     *  - StonePipeBlockEntity   for everything else (stone, cobble, gold, iron, wood...)
      *
-     * This keeps networking / sync simple and avoids needing a separate BE type
-     * for every single pipe variant.
+     * This lets all item pipes tick using one BE type ID on the wire.
      */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StonePipeBlockEntity>> STONE_PIPE =
             BLOCK_ENTITY_TYPES.register(
@@ -92,17 +92,40 @@ public final class ModBlockEntity {
             );
 
     /* --------------------------------------------------------------------- */
-    /* Engines                                                                */
+    /* Fluid Pipes                                                           */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * All *fluid* pipe blocks share one BlockEntityType.
+     *
+     * Right now every fluid pipe uses the same class (FluidPipeBlockEntity).
+     * Later you can specialize (GoldFluidPipeBlockEntity, IronFluidPipeBlockEntity, etc.).
+     *
+     * Add every concrete fluid pipe block variant to the Set below.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FluidPipeBlockEntity>> FLUID_PIPE =
+            BLOCK_ENTITY_TYPES.register(
+                    "fluid_pipe",
+                    () -> new BlockEntityType<>(
+                            FluidPipeBlockEntity::new,
+                            Set.of(
+                                    ModBlocks.STONE_FLUID_PIPE.get(),
+                                    ModBlocks.COBBLE_FLUID_PIPE.get()
+                            )
+                    )
+            );
+
+    /* --------------------------------------------------------------------- */
+    /* Engines                                                               */
     /* --------------------------------------------------------------------- */
 
     /**
      * All engines (redstone / stirling / combustion) share one BlockEntityType.
      *
      * Factory chooses subclass:
-     *  - StirlingEngineBlockEntity if it's specifically a StirlingEngineBlock
-     *    (has burnable fuel slot)
-     *  - EngineBlockEntity otherwise, with an EngineType inferred from the block
-     *    if possible. Fallback is REDSTONE.
+     *  - StirlingEngineBlockEntity if it's specifically a StirlingEngineBlock (has burnable fuel)
+     *  - Otherwise EngineBlockEntity, with EngineType pulled from the block
+     *  - Final fallback is REDSTONE
      */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EngineBlockEntity>> ENGINE =
             BLOCK_ENTITY_TYPES.register(
@@ -140,7 +163,7 @@ public final class ModBlockEntity {
             );
 
     /* --------------------------------------------------------------------- */
-    /* Tank                                                                   */
+    /* Tank                                                                  */
     /* --------------------------------------------------------------------- */
 
     /**
@@ -157,7 +180,7 @@ public final class ModBlockEntity {
             );
 
     /* --------------------------------------------------------------------- */
-    /* Mining Well                                                            */
+    /* Mining Well                                                           */
     /* --------------------------------------------------------------------- */
 
     /**
@@ -175,14 +198,14 @@ public final class ModBlockEntity {
             );
 
     /* --------------------------------------------------------------------- */
-    /* Pump                                                                   */
+    /* Pump                                                                  */
     /* --------------------------------------------------------------------- */
 
     /**
      * Pump controller:
      * - accepts engine pulses / FE,
      * - scans downward for source fluid,
-     * - "drains" that source into an internal tank,
+     * - drains that source into an internal tank,
      * - tells the client how long the hanging suction tube should be.
      *
      * This BE type must match ModBlocks.PUMP only.

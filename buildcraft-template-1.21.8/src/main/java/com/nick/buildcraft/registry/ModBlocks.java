@@ -5,6 +5,8 @@ import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
+import com.nick.buildcraft.content.block.fluidpipe.CobbleFluidPipeBlock;
+import com.nick.buildcraft.content.block.fluidpipe.StoneFluidPipeBlock;
 import com.nick.buildcraft.content.block.miningwell.MiningPipeBlock;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlock;
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
@@ -32,8 +34,10 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  *
  * Notes:
  *  - Some registry names start with "blockstate_" to match the asset folder names you already have.
- *  - Some helper blocks (frame, mining_pipe, moving_engine_ring, pump_tube_segment) are
- *    not intended to be normal placeable blocks with items.
+ *  - Helper blocks (frame, mining_pipe, moving_engine_ring, pump_tube_segment) are not intended
+ *    to be normal placeable blocks with items.
+ *  - For pipes (item + fluid), each concrete pipe variant gets its own DeferredBlock. The BE type
+ *    groups them.
  */
 public final class ModBlocks {
     private ModBlocks() {}
@@ -62,7 +66,7 @@ public final class ModBlocks {
             )
     );
 
-    /** Structural frame piece the quarry "builds" and that the renderer also fakes visually. */
+    /** Structural frame piece the quarry builds and the renderer also fakes visually. */
     public static final DeferredBlock<Block> FRAME = BLOCKS.register(
             "frame",
             () -> new FrameBlock(
@@ -81,7 +85,7 @@ public final class ModBlocks {
     );
 
     /* --------------------------------------------------------------------- */
-    /* Item transport pipes                                                  */
+    /* Item transport pipes (items)                                          */
     /* --------------------------------------------------------------------- */
 
     public static final DeferredBlock<Block> STONE_PIPE = BLOCKS.register(
@@ -181,6 +185,47 @@ public final class ModBlocks {
                                     ResourceLocation.fromNamespaceAndPath(
                                             BuildCraft.MODID,
                                             "wood_pipe"
+                                    )
+                            ))
+            )
+    );
+
+    /* --------------------------------------------------------------------- */
+    /* Fluid transport pipes (fluids)                                        */
+    /* --------------------------------------------------------------------- */
+
+    // Basic BuildCraft fluid pipes: stone and cobble versions.
+    // These correspond to StoneFluidPipeBlock / CobbleFluidPipeBlock, which subclass BaseFluidPipeBlock.
+
+    public static final DeferredBlock<Block> STONE_FLUID_PIPE = BLOCKS.register(
+            "stone_fluid_pipe",
+            () -> new StoneFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.STONE)
+                            .noOcclusion()
+                            .strength(1.5F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "stone_fluid_pipe"
+                                    )
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> COBBLE_FLUID_PIPE = BLOCKS.register(
+            "cobble_fluid_pipe",
+            () -> new CobbleFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.STONE)
+                            .noOcclusion()
+                            .strength(1.5F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "cobble_fluid_pipe"
                                     )
                             ))
             )
@@ -347,12 +392,7 @@ public final class ModBlocks {
 
     /**
      * One visual "hose segment" for the suction tube.
-     *
-     * We NEVER place this in the world.
-     * We only register it so:
-     *  - it has a blockstate/model baked by the model loader,
-     *  - PumpRenderer can grab that baked model and draw a column of them
-     *    down into the fluid.
+     * We NEVER place this in the world. It's just for baked-model rendering in PumpRenderer.
      *
      * No item, no loot table, no occlusion.
      */
@@ -360,8 +400,8 @@ public final class ModBlocks {
             "pump_tube_segment",
             () -> new PumpTubeSegmentBlock(
                     BlockBehaviour.Properties.of()
-                            .noOcclusion()   // don't hide faces next to neighbors
-                            .noCollission()  // it's a "fake" visual tube, not a real block you bump into
+                            .noOcclusion()
+                            .noCollission()
                             .strength(1.0F)
                             .noLootTable()
                             .setId(ResourceKey.create(
@@ -373,5 +413,4 @@ public final class ModBlocks {
                             ))
             )
     );
-
 }

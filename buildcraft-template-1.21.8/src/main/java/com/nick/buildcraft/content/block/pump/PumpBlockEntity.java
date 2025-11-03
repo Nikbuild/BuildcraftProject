@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.nick.buildcraft.api.engine.EnginePowerAcceptorApi;
 import com.nick.buildcraft.api.engine.EnginePulseAcceptorApi;
 import com.nick.buildcraft.energy.BCEnergyStorage;
-import com.nick.buildcraft.energy.Energy;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,36 +23,34 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
 /**
- * Pump with smooth payout + greedy "farthest-first" evaporation.
+ * PumpBlockEntity
  *
- * Behavior tweaks:
- * - Suction only starts when:
- *      (a) hose tip is snapped to a whole block height (no partial slice still feeding),
- *      AND
- *      (b) hose has fully extended to the deepest point it *can* currently reach
- *          (collision / bedrock limit).
+ * - Handles hose extension and sucking source blocks.
+ * - Stores pumped fluid in an internal tank.
+ * - Greedily clears leftover flowing water.
+ * - Syncs hose render state to clients.
  *
- * - After draining a source and confirming no sources remain feeding that blob,
- *   we don't nuke the blob or evaporate rings from the center. Instead we greedily
- *   delete the farthest flowing-water block(s) from the pump column over time.
- *   This makes distant side branches disappear first and the water at the hose
- *   itself is always last to vanish.
+ * NEW:
+ * - Every tick, tries to push fluid from its tank into ANY adjacent
+ *   neighbor that exposes IFluidHandler (pipe, tank, etc.).
  */
 public class PumpBlockEntity extends BlockEntity
         implements EnginePulseAcceptorApi, EnginePowerAcceptorApi {
 
-    /* ---------------- tuning knobs ---------------- */
+    /* -------------------------------- config -------------------------------- */
 
     private static final int MAX_SCAN_DEPTH = 256;
     private static final int BFS_MAX_NODES  = 256;
 
-    // how many ticks to feed 1 full block of hose (1.0 / 40 = 0.025 blocks/tick)
     private static final int HOSE_TICKS_PER_BLOCK = 40;
     private static final double FEED_SPEED_BLOCKS_PER_TICK =
             1.0 / (double) HOSE_TICKS_PER_BLOCK;
@@ -62,19 +59,16 @@ public class PumpBlockEntity extends BlockEntity
     private static final int MAX_FE = 200_000;
     private static final int SYNC_MIN_INTERVAL_TICKS = 8;
 
-    /** How many non-source water blocks to evaporate per cleanup step. */
     private static final int GREEDY_EVAP_BLOCKS_PER_STEP = 1;
-
-    /** Delay between cleanup steps, to control visual speed. */
     private static final int GREEDY_EVAP_TICK_DELAY = 5;
 
-    /** Tolerance for "has the hose reached a whole block boundary?" */
     private static final double WHOLE_BLOCK_EPS = 1.0e-3;
-
-    /** Tolerance for "hose is basically at final depth." */
     private static final double FINAL_DEPTH_EPS = 1.0e-3;
 
-    /* ---------------- live state ---------------- */
+    /** max mB to try and push out per tick TOTAL across all sides */
+    private static final int PUMP_PUSH_PER_TICK = 100;
+
+    /* -------------------------------- runtime state -------------------------------- */
 
     private final BCEnergyStorage energy =
             new BCEnergyStorage(MAX_FE, MAX_FE, s -> setChanged());
@@ -93,9 +87,10 @@ public class PumpBlockEntity extends BlockEntity
     private Double  lastSyncedExactY  = null;
     private int     syncCooldown      = 0;
 
+    /** internal holding tank for pumped fluid */
     private final FluidTank tank = new FluidTank(TANK_CAPACITY_MB, fs -> true);
 
-    /** Greedy cleanup state: anchor column we clean from, and throttle. */
+    /** staged cleanup state */
     private BlockPos cleanupAnchor = null;
     private int cleanupCooldown = 0;
 
@@ -110,9 +105,7 @@ public class PumpBlockEntity extends BlockEntity
         this.tubeHeadYExact = pos.getY();
     }
 
-    /* ------------------------------------------------------ */
-    /* Engine APIs                                            */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- Engine power API -------------------------------- */
 
     @Override
     public boolean acceptEnginePulse(Direction from) {
@@ -130,38 +123,44 @@ public class PumpBlockEntity extends BlockEntity
     }
 
     public BCEnergyStorage getEnergyStorage() { return energy; }
+
     public FluidTank getFluidTank() { return tank; }
 
-    /* ------------------------------------------------------ */
-    /* Tick                                                   */
-    /* ------------------------------------------------------ */
+    /** This is what ModCapabilities will expose as the pump's fluid capability. */
+    @Nullable
+    public IFluidHandler getFluidHandlerForSide(@Nullable Direction side) {
+        return tank;
+    }
+
+    /* -------------------------------- main tick -------------------------------- */
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, PumpBlockEntity be) {
         if (!(level instanceof ServerLevel server)) return;
 
-        // Keep downward-fluid guess updated.
+        // 1. track/find water target
         if (be.targetFluidPos == null || !be.isStillValidFluidSource(server, be.targetFluidPos)) {
             be.targetFluidPos = be.findClosestFluidBelow(server, pos);
         }
 
-        // Advance hose payout and clamp to collision.
+        // 2. advance hose physics
         be.advanceHose(server, pos);
 
-        // Try to drink (but only when hose is fully settled).
+        // 3. suck from world into internal tank if hose is settled
         be.tryDrainIfTouching(server);
 
-        // Continue staged "farthest-first" evaporation if armed.
+        // 4. collapse flowing leftovers visually
         be.stepGreedyEvaporation(server);
 
-        // Sync visual state.
+        // 5. NEW: try to output stored fluid into any neighbor with IFluidHandler
+        be.tryOutputToNeighbors(server);
+
+        // 6. sync tube render info to client
         be.maybeSyncToClient();
 
         be.setChanged();
     }
 
-    /* ------------------------------------------------------ */
-    /* Hose motion / collision                                */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- hose physics -------------------------------- */
 
     private int computeReachLimitY(ServerLevel level, BlockPos pumpPos) {
         int x = pumpPos.getX();
@@ -178,17 +177,16 @@ public class PumpBlockEntity extends BlockEntity
             boolean solidHitbox = !bs.getCollisionShape(level, p).isEmpty();
 
             if (!air && !fluid && solidHitbox) {
-                return y + 1; // hose tip must stay above this
+                return y + 1;
             }
         }
-
         return minY;
     }
 
     private void advanceHose(ServerLevel level, BlockPos pumpPos) {
         int pumpY = pumpPos.getY();
 
-        // Convert queued engine pulses -> number of whole blocks we "owe" to extend.
+        // convert # pulses into "blocks worth" of hose we still owe
         if (queuedPulses > 0) {
             pendingExtendBlocks += queuedPulses;
             queuedPulses = 0;
@@ -231,23 +229,11 @@ public class PumpBlockEntity extends BlockEntity
         tubeHeadY = snapY;
     }
 
-    /* ------------------------------------------------------ */
-    /* Hose readiness gates                                   */
-    /* ------------------------------------------------------ */
-
-    /** True when the hose tip is aligned to a whole block boundary (no partial slice still feeding). */
     private boolean hoseSnappedToWholeBlock() {
         double frac = deployedDepthBlocks - Math.floor(deployedDepthBlocks);
         return (frac < WHOLE_BLOCK_EPS) || (1.0 - frac < WHOLE_BLOCK_EPS);
     }
 
-    /**
-     * True when the hose has extended as deep as it's ALLOWED to go,
-     * i.e. deployedDepthBlocks ≈ (pumpY - reachLimitY).
-     *
-     * This prevents "mid-descent drinking": we won't suck while the hose
-     * is still lowering toward its final stop after placement / after a new pulse.
-     */
     private boolean hoseAtFinalDepth(ServerLevel level) {
         if (!poweredYet) return false;
         BlockPos pumpPos = getBlockPos();
@@ -259,11 +245,8 @@ public class PumpBlockEntity extends BlockEntity
         return Math.abs(deployedDepthBlocks - maxDepthAllowedBlocks) < FINAL_DEPTH_EPS;
     }
 
-    /* ------------------------------------------------------ */
-    /* Fluid search / suction / greedy evaporation            */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- sucking water -------------------------------- */
 
-    /** straight-down scan hint for targetFluidPos */
     private BlockPos findClosestFluidBelow(ServerLevel level, BlockPos origin) {
         int x = origin.getX();
         int z = origin.getZ();
@@ -292,10 +275,6 @@ public class PumpBlockEntity extends BlockEntity
         return !fs.isEmpty() && fs.isSource();
     }
 
-    /**
-     * Scan column under the pump (same X/Z) between yLo and yHi inclusive.
-     * Return the first BlockPos that currently contains any fluid.
-     */
     private BlockPos findNearestWaterAlongColumn(ServerLevel level, int x, int z, int yLo, int yHi) {
         if (yLo > yHi) { int tmp = yLo; yLo = yHi; yHi = tmp; }
         for (int y = yLo; y <= yHi; y++) {
@@ -307,14 +286,12 @@ public class PumpBlockEntity extends BlockEntity
         return null;
     }
 
-    /** Blob scan info. */
     private static class WaterBlobScan {
         final Set<BlockPos> visited = new HashSet<>();
         BlockPos sourceBlock = null;
         boolean anySourceStillPresent = false;
     }
 
-    /** BFS through connected water, up to BFS_MAX_NODES. */
     private WaterBlobScan bfsScanWaterBlob(ServerLevel level, BlockPos start, int maxNodes) {
         WaterBlobScan out = new WaterBlobScan();
 
@@ -352,14 +329,12 @@ public class PumpBlockEntity extends BlockEntity
     }
 
     /**
-     * Try to drain a real source if we're touching water. If the blob then has no sources,
-     * arm greedy cleanup starting from the pump column near the hose tip.
-     *
-     * NEW GATE:
-     *   We return immediately unless BOTH:
-     *     - hoseSnappedToWholeBlock() is true, AND
-     *     - hoseAtFinalDepth(level) is true.
-     * That blocks the "start sucking mid-drop" bug when the pump is first placed.
+     * Pull 1000 mB from the water blob the hose is touching, if:
+     * - hose is fully settled
+     * - we found an actual source block in reach
+     * Then:
+     * - remove that source block
+     * - maybe start greedy cleanup
      */
     private void tryDrainIfTouching(ServerLevel level) {
         if (!poweredYet) return;
@@ -370,7 +345,6 @@ public class PumpBlockEntity extends BlockEntity
         int x = pumpPos.getX();
         int z = pumpPos.getZ();
 
-        // scan the vertical band from the hose tip (floored) up to just above the pump
         int tipFloorY = Mth.floor(this.tubeHeadYExact);
         int scanBottom = tipFloorY;
         int scanTop    = pumpY + 1;
@@ -378,53 +352,47 @@ public class PumpBlockEntity extends BlockEntity
         BlockPos start = findNearestWaterAlongColumn(level, x, z, scanBottom, scanTop);
         if (start == null) return;
 
-        // scan before draining
+        // Look at the blob before we slurp
         WaterBlobScan scan1 = bfsScanWaterBlob(level, start, BFS_MAX_NODES);
-        if (scan1.sourceBlock == null) return; // no real source in reach
+        if (scan1.sourceBlock == null) return; // no SOURCE found
 
-        // pull 1000 mB from that source
+        // try to insert ~1 bucket into internal tank
         FluidState fsSrc = level.getFluidState(scan1.sourceBlock);
         if (fsSrc.isEmpty() || !fsSrc.isSource()) return;
 
         FluidStack bucket = new FluidStack(fsSrc.getType(), 1000);
         int filled = tank.fill(bucket, FluidTank.FluidAction.EXECUTE);
         if (filled <= 0) {
-            // tank full, don't alter world
+            // tank full, don't break world
             return;
         }
 
-        // remove the actual source block
+        // delete the source block we slurped
         level.setBlock(scan1.sourceBlock, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
         forceSyncSoon();
 
-        // re-scan for the blob touching the pump column (if any)
+        // after removing, see what blob is left touching our hose column
         BlockPos start2 = findNearestWaterAlongColumn(level, x, z, scanBottom, scanTop);
         if (start2 == null) {
-            // nothing left to clean
             cleanupAnchor = null;
             return;
         }
 
         WaterBlobScan scan2 = bfsScanWaterBlob(level, start2, BFS_MAX_NODES);
 
-        // If there's still ANY source in that connected blob, don't clean it.
+        // if there's still ANY source in the blob, don't evaporate
         if (scan2.anySourceStillPresent) {
             cleanupAnchor = null;
             return;
         }
 
-        // Arm greedy cleanup from the pump column.
+        // otherwise arm evaporation
         cleanupAnchor = start2.immutable();
-        cleanupCooldown = 0; // start collapsing soon
+        cleanupCooldown = 0;
     }
 
-    /**
-     * Greedy staged evaporation:
-     * - If armed and delay elapsed, flood-fill from cleanupAnchor,
-     *   gather all connected flowing water (no sources should remain),
-     *   pick the farthest cells from pump column and remove up to N.
-     * - This repeats every GREEDY_EVAP_TICK_DELAY ticks.
-     */
+    /* -------------------------------- greedy evaporation -------------------------------- */
+
     private void stepGreedyEvaporation(ServerLevel level) {
         if (cleanupAnchor == null) return;
 
@@ -433,11 +401,12 @@ public class PumpBlockEntity extends BlockEntity
             return;
         }
 
-        // If anchor itself isn't water anymore, try to re-anchor to nearest water in the hose column.
         BlockPos pumpPos = getBlockPos();
         int x = pumpPos.getX();
         int z = pumpPos.getZ();
         int pumpY = pumpPos.getY();
+
+        // If anchor isn't water anymore, re-anchor to current hose column water (or give up)
         if (level.getFluidState(cleanupAnchor).isEmpty()) {
             int tipFloorY = Mth.floor(this.tubeHeadYExact);
             BlockPos re = findNearestWaterAlongColumn(level, x, z, tipFloorY, pumpY + 1);
@@ -445,10 +414,9 @@ public class PumpBlockEntity extends BlockEntity
             cleanupAnchor = re.immutable();
         }
 
-        // Scan the current leftover blob from cleanupAnchor.
         WaterBlobScan scan = bfsScanWaterBlob(level, cleanupAnchor, BFS_MAX_NODES);
 
-        // If some new source crept in mid-cleanup, abort (lake refilled).
+        // blob refilled with sources? stop cleanup
         if (scan.anySourceStillPresent) {
             cleanupAnchor = null;
             return;
@@ -459,13 +427,13 @@ public class PumpBlockEntity extends BlockEntity
             return;
         }
 
-        // Pick farthest flowing-water blocks from pump column.
+        // Pick farthest flowing cells (non-source) to delete first
         List<BlockPos> candidates = new ArrayList<>();
         int bestDist = Integer.MIN_VALUE;
 
         for (BlockPos p : scan.visited) {
             FluidState fs = level.getFluidState(p);
-            if (fs.isEmpty() || fs.isSource()) continue; // only flowing water
+            if (fs.isEmpty() || fs.isSource()) continue;
             int d = Math.abs(p.getX() - x)
                     + Math.abs(p.getY() - pumpY)
                     + Math.abs(p.getZ() - z);
@@ -483,7 +451,6 @@ public class PumpBlockEntity extends BlockEntity
             return;
         }
 
-        // Remove up to GREEDY_EVAP_BLOCKS_PER_STEP of those farthest cells.
         int removed = 0;
         for (BlockPos p : candidates) {
             if (removed >= GREEDY_EVAP_BLOCKS_PER_STEP) break;
@@ -494,30 +461,94 @@ public class PumpBlockEntity extends BlockEntity
             }
         }
 
-        // Pace visual collapse.
         cleanupCooldown = GREEDY_EVAP_TICK_DELAY;
         if (removed > 0) forceSyncSoon();
     }
 
-    /* ------------------------------------------------------ */
-    /* Client sync + renderer hooks                           */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- pushing fluid OUT -------------------------------- */
 
-    public Integer getTubeRenderY() {
-        return poweredYet ? tubeHeadY : null;
+    /**
+     * Try to output up to PUMP_PUSH_PER_TICK mB into neighbors.
+     * We iterate all 6 faces. First face that takes anything gets fed.
+     * (This means you don't need perfect orientation just to test.)
+     */
+    private void tryOutputToNeighbors(ServerLevel level) {
+        int remaining = Math.min(PUMP_PUSH_PER_TICK, tank.getFluidAmount());
+        if (remaining <= 0) return;
+
+        // We’ll try every direction. As soon as we successfully send *some* fluid
+        // to someone, we’re happy for this tick.
+        for (Direction dir : Direction.values()) {
+            if (remaining <= 0) break;
+            remaining -= tryOutputOneSide(level, dir, remaining);
+        }
+
+        if (remaining < PUMP_PUSH_PER_TICK) {
+            // we actually moved fluid
+            setChanged();
+        }
     }
 
-    public Double getTubeRenderYExact() {
-        return poweredYet ? tubeHeadYExact : null;
+    /**
+     * Attempt to push up to `maxMb` into the neighbor on `dir`.
+     * Returns how much actually pushed.
+     */
+    private int tryOutputOneSide(ServerLevel level, Direction dir, int maxMb) {
+        if (maxMb <= 0) return 0;
+        if (tank.getFluidAmount() <= 0) return 0;
+
+        BlockPos neighborPos = worldPosition.relative(dir);
+
+        // ask the neighbor for a fluid handler that's facing *us*
+        IFluidHandler neighborCap = level.getCapability(
+                Capabilities.FluidHandler.BLOCK,
+                neighborPos,
+                dir.getOpposite()
+        );
+        if (neighborCap == null) {
+            return 0;
+        }
+
+        int toSend = Math.min(maxMb, tank.getFluidAmount());
+        if (toSend <= 0) return 0;
+
+        // simulate how much they'll take
+        FluidStack attempt = tank.getFluid().copyWithAmount(toSend);
+        int canAccept = neighborCap.fill(attempt, IFluidHandler.FluidAction.SIMULATE);
+        if (canAccept <= 0) {
+            return 0;
+        }
+
+        // actually drain that amount from us
+        FluidStack drained = tank.drain(canAccept, IFluidHandler.FluidAction.EXECUTE);
+        if (drained.isEmpty() || drained.getAmount() <= 0) {
+            return 0;
+        }
+
+        int accepted = neighborCap.fill(drained, IFluidHandler.FluidAction.EXECUTE);
+
+        // if there's overflow, put it back into our tank
+        int leftover = drained.getAmount() - accepted;
+        if (leftover > 0) {
+            tank.fill(drained.copyWithAmount(leftover), IFluidHandler.FluidAction.EXECUTE);
+        }
+
+        return accepted;
     }
+
+    /* -------------------------------- rendering sync -------------------------------- */
+
+    public Integer getTubeRenderY() { return poweredYet ? tubeHeadY : null; }
+
+    public Double getTubeRenderYExact() { return poweredYet ? tubeHeadYExact : null; }
 
     public int estimateMidTubeLight() {
         if (level == null) return 0x00F000F0;
         int pumpY = getBlockPos().getY();
         int midY = (pumpY + tubeHeadY) / 2;
         BlockPos sample = new BlockPos(getBlockPos().getX(), midY, getBlockPos().getZ());
-        int block = level.getBrightness(LightLayer.BLOCK, sample);
-        int sky   = level.getBrightness(LightLayer.SKY,   sample);
+        int block = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, sample);
+        int sky   = level.getBrightness(net.minecraft.world.level.LightLayer.SKY,   sample);
         return (sky << 20) | (block << 4);
     }
 
@@ -560,9 +591,7 @@ public class PumpBlockEntity extends BlockEntity
         }
     }
 
-    /* ------------------------------------------------------ */
-    /* Save / Load                                            */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- save/load -------------------------------- */
 
     @Override
     protected void loadAdditional(ValueInput in) {
@@ -589,7 +618,6 @@ public class PumpBlockEntity extends BlockEntity
         in.child("Energy").ifPresent(energy::deserialize);
         tank.deserialize(in.childOrEmpty("Tank"));
 
-        // cleanup state is runtime only; clear on load
         this.cleanupAnchor = null;
         this.cleanupCooldown = 0;
 
@@ -619,12 +647,9 @@ public class PumpBlockEntity extends BlockEntity
 
         this.energy.serialize(out.child("Energy"));
         this.tank.serialize(out.child("Tank"));
-        // cleanupAnchor / cleanupCooldown are intentionally not persisted
     }
 
-    /* ------------------------------------------------------ */
-    /* Networking                                             */
-    /* ------------------------------------------------------ */
+    /* -------------------------------- networking -------------------------------- */
 
     @Override
     public Packet<ClientGamePacketListener> getUpdatePacket() {

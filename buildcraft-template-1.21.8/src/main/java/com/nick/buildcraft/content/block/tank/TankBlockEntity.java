@@ -2,6 +2,7 @@ package com.nick.buildcraft.content.block.tank;
 
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -19,25 +20,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Stacked tanks behave visually like one column; each tank keeps its own saved fluid.
- * Column handler implements segmented fill/drain inside a compatibility chain:
- *  - Fill: bottom → up (but only if the whole chain is empty or already the same fluid).
- *  - Drain: top → down within the top contiguous same-fluid segment.
+ * Multiblock vertical tank column.
  *
- * Additionally, we implement "downward compaction":
- *  - When a vertical neighbor changes (break/place), any fluid in the broken block is lost.
- *  - Remaining fluid above is pulled downward to fill empty space, without crossing
- *    different-fluid barriers.
+ * Each block stores its own FluidTank, but external IO (capability) sees the whole
+ * compatible column as one "virtual tank" via ColumnFluidHandler:
  *
- * "Compatibility chain": vertical adjacency only counts if fluids are compatible
- * (either side empty OR same fluid+components). All logic respects this.
+ *  - Fill goes bottom → up, but only if the column is empty OR it's the same fluid.
+ *  - Drain comes from the top contiguous segment of the same fluid.
+ *
+ * We also "compact downward" on the server so gaps get pulled down after breaks.
  */
 public class TankBlockEntity extends BlockEntity {
 
     /** Each tank holds 16 buckets (16,000 mB). */
     public static final int CAPACITY = 16_000;
 
-    /** Per-block storage. The column handler wraps this for bucket UX only. */
+    /** Per-block storage. The column handler wraps this for bucket UX / external IO. */
     private final FluidTank tank = new FluidTank(CAPACITY) {
         @Override
         protected void onContentsChanged() {
@@ -45,10 +43,10 @@ public class TankBlockEntity extends BlockEntity {
             Level lvl = getLevel();
             if (lvl == null || lvl.isClientSide) return;
 
-            // Recalculate column once on the server
+            // Recalculate chain once on the server
             recomputeColumnCache();
 
-            // Notify all column segments of change + force live re-renders/cap refresh
+            // Notify all column segments of change + force re-render + cap invalidation
             BlockPos p = getColumnBottom();
             for (TankBlockEntity tbe : collectColumn()) {
                 tbe.onColumnContentsChanged();
@@ -69,7 +67,7 @@ public class TankBlockEntity extends BlockEntity {
     private @Nullable BlockPos cachedBottom;
     private int cachedSize = -1;
 
-    /* -------- column-wide capability (for buckets only) -------- */
+    /* -------- column-wide capability (exposed externally) -------- */
     private final IFluidHandler columnHandler = new ColumnFluidHandler();
 
     /* -------- client animation state (not saved) -------- */
@@ -104,9 +102,9 @@ public class TankBlockEntity extends BlockEntity {
         // Recompute caches locally
         recomputeColumnCache();
 
-        // ---- One-time upgrade/heal for old worlds ----
         Level lvl = getLevel();
         if (lvl != null) {
+            // Re-sync entire column once on load
             for (TankBlockEntity tbe : collectColumn()) {
                 BlockPos p = tbe.getBlockPos();
                 tbe.recomputeColumnCache();
@@ -132,10 +130,10 @@ public class TankBlockEntity extends BlockEntity {
         Level lvl = getLevel();
         if (lvl == null) return;
 
-        // Recompute on this side (server OR client) so render data is correct immediately
+        // Recompute local cache now (client or server)
         recomputeColumnCache();
 
-        // Notify the whole compatibility chain on the current side
+        // Tell the rest of the stack on this side to also refresh
         for (TankBlockEntity tbe : collectColumn()) {
             BlockPos p = tbe.getBlockPos();
             tbe.recomputeColumnCache();
@@ -161,10 +159,24 @@ public class TankBlockEntity extends BlockEntity {
     /* ----------------- Accessors ----------------- */
 
     public FluidTank getTank() { return tank; }
-    /** For bucket UX (block uses this); NOT exposed as a capability. */
+
+    /** Internal column handler for IO / bucket UX. Exposed via capability. */
     public IFluidHandler getColumnHandler() { return columnHandler; }
+
     /** Server helper to replace contents (fires change notifications). */
     public void setFluid(FluidStack stack) { tank.setFluid(stack.copy()); }
+
+    /**
+     * Capability exposure to outside world.
+     * Pipes, etc., will call this via ModCapabilities.
+     *
+     * We always return the columnHandler, not the raw per-block tank,
+     * so stacked tanks behave as one big tank for fill/drain.
+     */
+    @Nullable
+    public IFluidHandler getFluidHandlerForSide(@Nullable Direction side) {
+        return columnHandler;
+    }
 
     /* ----------------- Compatibility helpers ----------------- */
 
@@ -210,11 +222,12 @@ public class TankBlockEntity extends BlockEntity {
         BlockEntity be = level.getBlockEntity(origin);
         if (!(be instanceof TankBlockEntity self)) return null;
 
-        // Find bottom by walking down across compatible neighbors only
+        // Walk down to find bottom across compatible neighbors only
         BlockPos bottom = origin;
         while (isCompatNeighbor(level, bottom, bottom.below())) bottom = bottom.below();
 
-        int size = 0, total = 0;
+        int size = 0;
+        int total = 0;
         FluidStack rep = FluidStack.EMPTY;
         BlockPos p = bottom;
 
@@ -251,16 +264,16 @@ public class TankBlockEntity extends BlockEntity {
         return Math.max(1, cachedSize);
     }
 
-    /** Count size from the true bottom (not from this.worldPosition). */
+    /** Re-scan to cache true bottom + full chain size. */
     private void recomputeColumnCache() {
         Level lvl = getLevel();
         if (lvl == null) return;
 
-        // Walk DOWN to find the true bottom across compatible neighbors
+        // Walk DOWN to find the real bottom across compatible neighbors
         BlockPos bottom = this.worldPosition;
         while (isCompatNeighbor(lvl, bottom, bottom.below())) bottom = bottom.below();
 
-        // Walk UP from that bottom to count the ENTIRE chain
+        // Walk UP from that bottom to count entire chain
         int size = 1;
         BlockPos p = bottom;
         while (isCompatNeighbor(lvl, p, p.above())) {
@@ -273,11 +286,6 @@ public class TankBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    private static boolean isTank(Level lvl, BlockPos pos) {
-        return lvl.getBlockEntity(pos) instanceof TankBlockEntity;
-    }
-
-    /** Build the chain by scanning up from the true bottom; no reliance on cached size alone. */
     private List<TankBlockEntity> collectColumn() {
         List<TankBlockEntity> list = new ArrayList<>();
         Level lvl = getLevel();
@@ -301,6 +309,7 @@ public class TankBlockEntity extends BlockEntity {
 
     private boolean compacting = false;
 
+    /** Server-side: pull fluid down into gaps in the column, without mixing different fluids. */
     public void compactDownwardServer() {
         Level lvl = getLevel();
         if (lvl == null || lvl.isClientSide || compacting) return;
@@ -348,7 +357,7 @@ public class TankBlockEntity extends BlockEntity {
             compacting = false;
         }
 
-        // After compaction, send a refresh to the stack.
+        // After compaction, notify chain again
         for (TankBlockEntity tbe : collectColumn()) {
             BlockPos p = tbe.getBlockPos();
             tbe.onColumnContentsChanged();
@@ -384,7 +393,7 @@ public class TankBlockEntity extends BlockEntity {
         /**
          * FILL policy:
          * - Hard rule: a chain may only contain one non-empty fluid type.
-         *   If any tank in the chain holds a different non-empty fluid, reject the fill (return 0).
+         *   If any tank in the chain holds a different non-empty fluid, reject the fill.
          * - Otherwise, fill bottom→up.
          */
         @Override
@@ -394,15 +403,15 @@ public class TankBlockEntity extends BlockEntity {
             List<TankBlockEntity> tanks = collectColumn();
             if (tanks.isEmpty()) return 0;
 
-            // NEW: reject if the chain already contains a different non-empty fluid anywhere
+            // reject if chain already contains a different non-empty fluid anywhere
             for (TankBlockEntity t : tanks) {
                 FluidStack cur = t.getTank().getFluid();
                 if (!cur.isEmpty() && !FluidStack.isSameFluidSameComponents(cur, resource)) {
-                    return 0; // disallow mixed chains → no sound, no consume
+                    return 0; // disallow mixed chains → caller shouldn't consume
                 }
             }
 
-            // Chain is empty or already the same fluid → normal bottom-up fill.
+            // Chain is empty or already same fluid → normal bottom-up fill.
             int toFill = resource.getAmount();
             int filled = 0;
 
@@ -435,7 +444,7 @@ public class TankBlockEntity extends BlockEntity {
             List<TankBlockEntity> tanks = collectColumn();
             if (tanks.isEmpty()) return FluidStack.EMPTY;
 
-            // Locate the current top segment (topmost non-empty tank)
+            // Locate topmost non-empty tank; that's our head fluid.
             int topIndex = -1;
             FluidStack topFluid = FluidStack.EMPTY;
             for (int i = tanks.size() - 1; i >= 0; i--) {
@@ -453,8 +462,8 @@ public class TankBlockEntity extends BlockEntity {
 
             for (int i = topIndex; i >= 0 && remaining > 0; i--) {
                 FluidStack cur = tanks.get(i).getTank().getFluid();
-                if (cur.isEmpty()) break; // reached end of the contiguous top segment
-                if (!FluidStack.isSameFluidSameComponents(cur, topFluid)) break; // different-fluid barrier
+                if (cur.isEmpty()) break; // hit an empty gap
+                if (!FluidStack.isSameFluidSameComponents(cur, topFluid)) break; // different fluid barrier
 
                 int step = Math.min(remaining, cur.getAmount());
                 if (step <= 0) continue;
@@ -476,17 +485,18 @@ public class TankBlockEntity extends BlockEntity {
         public FluidStack drain(FluidStack resource, FluidAction action) {
             if (resource == null || resource.isEmpty()) return FluidStack.EMPTY;
 
-            // Only drain the current top segment; require same fluid
             List<TankBlockEntity> tanks = collectColumn();
             if (tanks.isEmpty()) return FluidStack.EMPTY;
 
-            // Find top segment fluid
+            // Get the top segment fluid
             FluidStack topFluid = FluidStack.EMPTY;
             for (int i = tanks.size() - 1; i >= 0; i--) {
                 FluidStack cur = tanks.get(i).getTank().getFluid();
                 if (!cur.isEmpty()) { topFluid = cur.copy(); break; }
             }
-            if (topFluid.isEmpty() || !FluidStack.isSameFluidSameComponents(topFluid, resource)) return FluidStack.EMPTY;
+            if (topFluid.isEmpty() || !FluidStack.isSameFluidSameComponents(topFluid, resource)) {
+                return FluidStack.EMPTY;
+            }
 
             return drain(resource.getAmount(), action);
         }
@@ -506,7 +516,10 @@ public class TankBlockEntity extends BlockEntity {
         }
     }
 
-    /** Ease 1 whole tank over 8 ticks (½ tick per bucket). */
+    /**
+     * Smooth client-side fill animation:
+     * ease toward the new total over ~8 ticks per full tank.
+     */
     public float getAnimatedHeights(float instantaneousHeights, float partialTicks) {
         Level lvl = getLevel();
         if (lvl == null) return instantaneousHeights;

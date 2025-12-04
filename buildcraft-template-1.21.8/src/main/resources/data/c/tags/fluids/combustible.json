@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "buildcraft:oil",
+    "buildcraft:fuel",
+    "buildcraft:flowing_oil",
+    "buildcraft:flowing_fuel"
+  ]
+}

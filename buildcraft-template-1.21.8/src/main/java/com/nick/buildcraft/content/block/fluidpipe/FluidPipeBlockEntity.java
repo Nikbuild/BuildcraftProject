@@ -1,14 +1,17 @@
 package com.nick.buildcraft.content.block.fluidpipe;
 
+import com.mojang.serialization.Codec;
+import com.nick.buildcraft.content.block.tank.TankBlockEntity;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -16,513 +19,683 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.EnumMap;
 
 /**
- * FluidPipeBlockEntity
+ * Simplified fluid pipe with "wave" behaviour + tank handoff:
  *
- * Think "BC fluid pipe brain".
- * We simulate packets ("sections") of fluid moving through a pipe,
- * bouncing if blocked, and pushing into adjacent pipes / machines.
+ * - Pump still just calls fill/offer on the first pipe.
+ * - Pipes own the visual logic:
+ *   - When FIRST pipe next to a non-pipe neighbour receives fluid, it
+ *     becomes an injection root and increments unitsInjected.
+ *   - For that root, fluid front distance = unitsInjected * REACH_PER_UNIT pipes.
+ *   - A smooth head position (frontPos) animates toward that distance.
+ *   - Each pipe knows its integer distanceFromRoot in pipe steps.
+ *   - Renderer uses distanceFromRoot + frontPos to draw a "snake" inside
+ *     each relevant pipe (partial fill when head is inside that block).
  *
- * Visual: each section tracks progress 0..1 toward its current outDir.
- * Logic: tickFluids() advances them, tries to hand off at 1.0.
+ * - NEW: Proper corner/junction detection to prevent fluid rendering outside pipe bounds.
+ *   The entity now tracks which directions have actual pipe connections to guide rendering.
  *
- * Capability: each side exposes a 1-tank handler that only supports fill(...).
+ * - Respects endpoint-only connection logic - only considers neighbors
+ *   that are actually connected via the blockstate connection properties.
+ *
+ * - If a pipe in the chain touches a TankBlockEntity, then as the
+ *   wave passes through that pipe it will transfer real fluid into the tank
+ *   via the tank's ColumnFluidHandler.
+ *
+ * - CAPACITY LIMITS: Each pipe segment can hold a maximum amount of fluid.
  */
 public class FluidPipeBlockEntity extends BlockEntity {
 
-    /** mB per moving "section". */
-    private static final int SECTION_CAPACITY = 1000;
+    // How many pipes per "unit" of water (you set this to 1)
+    public static final int REACH_PER_UNIT = 1;
 
-    /** Base movement speed per tick, 0..1 per tick is "one block per tick". */
-    private static final float BASE_SPEED = 0.10f;
+    // how many mB of fluid counts as "one unit" for extending REACH_PER_UNIT pipes
+    private static final int MB_PER_UNIT = 1000;
 
-    /** Hide a section for a couple ticks after we bounce it, to avoid flicker. */
-    private static final int CUT_HIDE_TICKS = 2;
+    // Maximum units each pipe segment can hold (1 bucket per pipe)
+    private static final int MAX_UNITS_PER_PIPE = 1;
 
-    /** Hard max concurrent sections in one pipe. */
-    private static final int MAX_SECTIONS = 16;
+    // accumulator to handle many small pump packets
+    private int injectedMbAccum = 0;
 
-    /** One moving blob of fluid. */
-    private static final class Section {
-        FluidStack fluid = FluidStack.EMPTY;
-        int amountMb = 0;
+    // Visual speed: pipes per tick that the head moves
+    private static final float FRONT_SPEED = 0.12f; // ~1 full pipe every ~8 ticks
 
-        @Nullable Direction fromDir = null; // where it entered FROM
-        @Nullable Direction outDir  = null; // where it's trying to go TO
+    // ---- per-network (root-based) state ----
 
-        float progress = 0f;   // 0..1 visual offset along outDir from pipe center
-        int   dirSign  = +1;   // +1 = heading out, -1 = bouncing back toward center
-        int   cutHide  = 0;    // render cooldown
-        boolean sourceSection = false; // originally injected from neighbor?
-        float speed = BASE_SPEED;
-    }
+    /** True if this pipe is a root (directly receiving from a pump/tank/etc). */
+    private boolean isRoot = false;
 
-    /* ---------------- State ---------------- */
+    /** Total "units" of water injected at this root (each ~= MB_PER_UNIT mB). */
+    private int unitsInjected = 0;
 
-    /** Active moving packets inside this pipe. */
-    private final List<Section> sections = new ArrayList<>();
+    /** Total units that have been delivered/consumed from the network */
+    private int unitsConsumed = 0;
+
+    /** Animated head position measured in pipes from root (0 at first pipe). */
+    private float frontPos = 0f;
+
+    // ---- per-pipe state ----
+
+    /** Distance (in pipe steps) from the root. 1 = first pipe, 2 = next, etc. */
+    private int distanceFromRoot = Integer.MAX_VALUE;
+
+    /** Previous distanceFromRoot to detect topology changes */
+    private int prevDistanceFromRoot = Integer.MAX_VALUE;
+
+    /** Fluid type to show (propagated from root). */
+    private FluidStack displayedFluid = FluidStack.EMPTY;
 
     /**
-     * Per-side fluid handler.
-     * Neighbors call fill(...) on this to inject fluid INTO the pipe.
-     * drain(...) is disabled because pipes don't serve as extractors yet.
+     * For endpoint pipes that sit next to a tank: how many "units" of the wave
+     * have already been delivered into the tank so we don't double-count.
      */
+    private int unitsDeliveredToTank = 0;
+
+    /** Per-side capability handlers. */
     private final EnumMap<Direction, SideFluidHandler> sideHandlers = new EnumMap<>(Direction.class);
 
     public FluidPipeBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntity.FLUID_PIPE.get(), pos, state);
-
         for (Direction d : Direction.values()) {
             sideHandlers.put(d, new SideFluidHandler(d));
         }
     }
 
-    /* =========================================================================================
-     * Capability entry point
-     * =========================================================================================
-     */
+    /* ---------------------------------------------------------------------- */
+    /* Public API for renderer                                                */
+    /* ---------------------------------------------------------------------- */
+
+    /** Distance from root (pipe steps), Integer.MAX_VALUE = not in a rooted network. */
+    public int getDistanceFromRoot() {
+        return distanceFromRoot;
+    }
 
     /**
-     * Accept incoming fluid from a neighbor on a given side (like IFluidHandler.fill).
-     * Returns amount actually accepted.
+     * Head position (in pipes) measured from the root pipe, using the root's data.
+     * Pipes that are not in any rooted network return 0.
      */
-    private int tryAcceptFromSide(FluidStack incoming, Direction fromSide, IFluidHandler.FluidAction action) {
-        if (incoming == null || incoming.isEmpty()) return 0;
-        if (sections.size() >= MAX_SECTIONS) return 0;
+    public float getFrontPos() {
+        // Root stores its own frontPos.
+        if (isRoot) return frontPos;
 
-        // only the server mutates
-        if (level == null || level.isClientSide) {
-            if (action.execute()) return 0;
-        }
+        if (level == null || distanceFromRoot == Integer.MAX_VALUE) return 0f;
 
-        // Try to merge into an existing compatible section.
-        Section s = null;
-        for (Section existing : sections) {
-            if (canMerge(existing, incoming, fromSide)) {
-                s = existing;
-                break;
-            }
-        }
+        float bestFront = 0f;
+        int bestDist = Integer.MAX_VALUE;
 
-        // If none found, consider spawning a brand new section.
-        if (s == null) {
-            if (action.simulate()) {
-                // We *could* create one and accept up to capacity
-                return Math.min(incoming.getAmount(), SECTION_CAPACITY);
-            }
+        // Look for a neighbour that is closer to the root than we are,
+        // and recursively pull its frontPos. This lets the head value
+        // propagate down the whole chain, not just the first pipe.
+        for (Direction dir : Direction.values()) {
+            // Only check directions where we actually have a connection
+            if (!isConnectedInDirection(dir)) continue;
 
-            s = new Section();
-            s.sourceSection = true;
-            s.fromDir = fromSide;
-            s.outDir = pickInitialOutDir(fromSide, incoming);
-            s.progress = 0f;
-            s.dirSign = +1;
-            s.speed = BASE_SPEED;
-            s.fluid = incoming.copy();
-            s.fluid.setAmount(0); // we'll grow it as we accept
-            s.amountMb = 0;
-
-            sections.add(s);
-        }
-
-        int canTake = SECTION_CAPACITY - s.amountMb;
-        if (canTake <= 0) return 0;
-
-        int toTake = Math.min(canTake, incoming.getAmount());
-        if (toTake <= 0) return 0;
-
-        if (action.execute()) {
-            s.amountMb += toTake;
-            s.fluid.setAmount(s.amountMb);
-            setChanged();
-            requestSyncNow();
-        }
-
-        return toTake;
-    }
-
-    /** true if we can merge 'incoming' into existing section */
-    private boolean canMerge(Section s, FluidStack incoming, Direction fromSide) {
-        if (s == null) return false;
-        if (s.amountMb >= SECTION_CAPACITY) return false;
-        if (s.fluid.isEmpty()) return true;
-
-        // Must be same fluid+components
-        if (!FluidStack.isSameFluidSameComponents(s.fluid, incoming)) return false;
-
-        // We don't care yet about fromSide/outDir matching.
-        return true;
-    }
-
-    @Nullable
-    private Direction pickInitialOutDir(Direction fromSide, FluidStack stack) {
-        // naive default: shoot it straight out the opposite face
-        return fromSide.getOpposite();
-    }
-
-    /* =========================================================================================
-     * Main tick logic
-     * =========================================================================================
-     */
-
-    /** External ticker calls this each tick. */
-    public void tickFluids() {
-        tickInternal();
-    }
-
-    private void tickInternal() {
-        if (level == null || level.isClientSide) return;
-        if (sections.isEmpty()) return;
-
-        boolean changed = false;
-
-        for (Iterator<Section> it = sections.iterator(); it.hasNext();) {
-            Section sec = it.next();
-
-            if (sec.cutHide > 0) sec.cutHide--;
-
-            // Make sure target direction still makes sense.
-            validateOrRetarget(sec);
-
-            // Move toward / away from edge
-            sec.progress += sec.speed * sec.dirSign;
-
-            // clamp
-            if (sec.progress < 0f) sec.progress = 0f;
-            if (sec.progress > 1f) sec.progress = 1f;
-
-            // If bouncing inward and we reached center, flip back outward
-            if (sec.dirSign < 0 && sec.progress <= 0f) {
-                sec.dirSign = +1;
-                sec.outDir = sec.fromDir;
-                changed = true;
-                continue;
-            }
-
-            // If going outward and we reached edge, try to hand off
-            if (sec.dirSign > 0 && sec.progress >= 1f) {
-                boolean transferred = tryPushToNeighbor(sec);
-                if (transferred) {
-                    // section completely moved out
-                    it.remove();
-                    changed = true;
-                } else {
-                    // blocked, bounce
-                    sec.dirSign = -1;
-                    sec.progress = 1f;
-                    sec.cutHide = CUT_HIDE_TICKS;
-                    changed = true;
+            BlockPos np = worldPosition.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof FluidPipeBlockEntity other) {
+                // Only consider neighbors that are actually part of the flow path
+                if (other.distanceFromRoot < this.distanceFromRoot && other.distanceFromRoot != Integer.MAX_VALUE) {
+                    float candidate = other.getFrontPos();
+                    if (other.distanceFromRoot < bestDist) {
+                        bestDist = other.distanceFromRoot;
+                        bestFront = candidate;
+                    }
                 }
             }
         }
 
-        if (changed) {
-            setChanged();
-            requestSyncNow();
-        }
+        return bestFront;
+    }
+
+    /** Which fluid to draw. */
+    public FluidStack getDisplayedFluid() {
+        return displayedFluid;
+    }
+
+    /** True if there is any amount of fluid in this pipe visually. */
+    public boolean hasAnyFluid() {
+        return getFillFraction() > 0f && !displayedFluid.isEmpty();
     }
 
     /**
-     * Called by the block when neighbors are changed, so we can re-check routing.
+     * Returns how full this pipe is (0..1) based on distanceFromRoot and the front position.
+     *
+     *  - If front hasn't reached this pipe yet -> 0
+     *  - If front has passed completely       -> 1
+     *  - If front is inside this pipe         -> fraction in [0,1]
+     *
+     * NEW: Returns 0 if this pipe is not actually part of the active flow path.
      */
-    public void onNeighborGraphChanged(BlockPos changedPos) {
-        if (level == null || level.isClientSide) return;
-        setChanged();
-        requestSyncNow();
-    }
+    public float getFillFraction() {
+        if (distanceFromRoot == Integer.MAX_VALUE) return 0f;
 
-    /** Recheck if sec.outDir is still valid; reroute or bounce if not. */
-    private void validateOrRetarget(Section sec) {
-        if (sec.outDir == null) return;
+        // NEW: Verify this pipe is actually on the flow path by checking if we have
+        // a valid upstream neighbor
+        if (!isOnActiveFlowPath()) return 0f;
 
-        Direction out = sec.outDir;
-        BlockPos destPos = worldPosition.relative(out);
+        float head = getFrontPos(); // pipes from root
+        if (head <= 0f) return 0f;
 
-        if (!canOutputTo(destPos, out, sec)) {
-            Direction newDir = chooseBetterDir(sec);
-            if (newDir != null) {
-                sec.outDir = newDir;
-            } else {
-                // bounce
-                sec.dirSign = -1;
-                sec.cutHide = CUT_HIDE_TICKS;
-            }
-        }
-    }
+        // pipes are indexed [0..), distanceFromRoot=1 means segment [0,1)
+        float segmentStart = distanceFromRoot - 1;
+        float segmentEnd   = distanceFromRoot;
 
-    @Nullable
-    private Direction chooseBetterDir(Section sec) {
-        for (Direction d : Direction.values()) {
-            if (sec.fromDir != null && d == sec.fromDir) continue;
-            BlockPos np = worldPosition.relative(d);
-            if (canOutputTo(np, d, sec)) return d;
-        }
-        return null;
+        if (head <= segmentStart) return 0f;
+        if (head >= segmentEnd)   return 1f;
+
+        return head - segmentStart; // [0..1)
     }
 
     /**
-     * Can we push this section into neighbor at pos/toward?
-     * Accepts:
-     *  - another FluidPipeBlockEntity with room
-     *  - any block face exposing IFluidHandler that will fill(...)
+     * NEW: Check if this pipe is actually on the active flow path.
+     * A pipe is on the flow path if:
+     * - It's the root, OR
+     * - It has at least one connected neighbor with a lower distanceFromRoot
      */
-    private boolean canOutputTo(BlockPos pos, Direction toward, Section sec) {
+    private boolean isOnActiveFlowPath() {
+        if (isRoot) return true;
         if (level == null) return false;
+        if (distanceFromRoot == Integer.MAX_VALUE) return false;
 
-        // Pipe neighbor
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof FluidPipeBlockEntity other) {
-            return other.canAcceptFromNeighbor(sec, toward.getOpposite());
-        }
+        // Check if we have any upstream neighbor (closer to root)
+        for (Direction dir : Direction.values()) {
+            if (!isConnectedInDirection(dir)) continue;
 
-        // Generic fluid endpoint
-        IFluidHandler cap = level.getCapability(
-                Capabilities.FluidHandler.BLOCK,
-                pos,
-                toward.getOpposite()
-        );
-        if (cap != null) {
-            FluidStack offer = sec.fluid.copyWithAmount(sec.amountMb);
-            int filled = cap.fill(offer, IFluidHandler.FluidAction.SIMULATE);
-            return filled > 0;
-        }
-
-        return false;
-    }
-
-    /** Whether THIS pipe would accept some/all of "fromOther" coming in from given side. */
-    private boolean canAcceptFromNeighbor(Section fromOther, Direction incomingFrom) {
-        if (sections.size() >= MAX_SECTIONS) return false;
-
-        // can we merge?
-        for (Section s : sections) {
-            if (canMerge(s, fromOther.fluid, incomingFrom)) return true;
-        }
-        // or spawn new one
-        return true;
-    }
-
-    /**
-     * Try to hand this section's fluid off to neighbor in sec.outDir.
-     * Return true if entire section got handed off (so caller should remove it).
-     */
-    private boolean tryPushToNeighbor(Section sec) {
-        if (sec.outDir == null || sec.amountMb <= 0 || level == null) return false;
-
-        BlockPos targetPos = worldPosition.relative(sec.outDir);
-
-        // 1) Neighbor fluid pipe
-        BlockEntity be = level.getBlockEntity(targetPos);
-        if (be instanceof FluidPipeBlockEntity other) {
-            int moved = other.receiveFromNeighbor(sec, sec.outDir.getOpposite());
-            if (moved > 0) {
-                sec.amountMb -= moved;
-                sec.fluid.setAmount(sec.amountMb);
-                return sec.amountMb <= 0;
+            BlockPos np = worldPosition.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof FluidPipeBlockEntity other) {
+                if (other.distanceFromRoot < this.distanceFromRoot &&
+                        other.distanceFromRoot != Integer.MAX_VALUE) {
+                    return true; // Found an upstream connection
+                }
             }
         }
 
-        // 2) Generic fluid handler (tank, pump, etc.)
-        IFluidHandler cap = level.getCapability(
-                Capabilities.FluidHandler.BLOCK,
-                targetPos,
-                sec.outDir.getOpposite()
-        );
-        if (cap != null) {
-            FluidStack offer = sec.fluid.copyWithAmount(sec.amountMb);
-            int filled = cap.fill(offer, IFluidHandler.FluidAction.EXECUTE);
-            if (filled > 0) {
-                sec.amountMb -= filled;
-                sec.fluid.setAmount(sec.amountMb);
-                return sec.amountMb <= 0;
-            }
-        }
+        return false; // No upstream connection = not on active path
+    }
 
-        return false;
+    /* ---------------------------------------------------------------------- */
+    /* Connection helpers                                                      */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Check if this pipe has a valid connection in the given direction
+     * based on the blockstate connection properties.
+     */
+    private boolean isConnectedInDirection(Direction dir) {
+        BlockState state = getBlockState();
+        BooleanProperty prop = getPropertyForDirection(dir);
+        return state.hasProperty(prop) && state.getValue(prop);
     }
 
     /**
-     * Called by neighbor pipe when handing off fluid.
-     * Always executes immediately on server.
+     * Get the BooleanProperty for a given direction.
      */
-    private int receiveFromNeighbor(Section fromOther, Direction incomingFrom) {
-        if (fromOther == null || fromOther.amountMb <= 0) return 0;
-        if (sections.size() >= MAX_SECTIONS) return 0;
+    private static BooleanProperty getPropertyForDirection(Direction dir) {
+        return switch (dir) {
+            case NORTH -> BaseFluidPipeBlock.NORTH;
+            case SOUTH -> BaseFluidPipeBlock.SOUTH;
+            case EAST  -> BaseFluidPipeBlock.EAST;
+            case WEST  -> BaseFluidPipeBlock.WEST;
+            case UP    -> BaseFluidPipeBlock.UP;
+            case DOWN  -> BaseFluidPipeBlock.DOWN;
+        };
+    }
 
-        // try to merge into existing
-        for (Section s : sections) {
-            if (!canMerge(s, fromOther.fluid, incomingFrom)) continue;
+    /* ---------------------------------------------------------------------- */
+    /* Ticking                                                                 */
+    /* ---------------------------------------------------------------------- */
 
-            int canTake = SECTION_CAPACITY - s.amountMb;
-            if (canTake <= 0) continue;
+    /** Old hook used by block. */
+    public void tickFluids() {
+        tick();
+    }
 
-            int toTake = Math.min(canTake, fromOther.amountMb);
-            if (toTake <= 0) continue;
+    /** Tick: server owns the simulation; client just renders synced state. */
+    public void tick() {
+        if (level == null) return;
 
-            s.amountMb += toTake;
-            s.fluid.setAmount(s.amountMb);
-            s.fromDir = incomingFrom;
-            s.outDir = pickInitialOutDir(incomingFrom, s.fluid);
+        // Both sides keep topology / fluid type up to date
+        updateDistanceFromRoot(level, worldPosition);
+        propagateFluidType(level, worldPosition);
+
+        // 🔑 Only the SERVER advances the wave and does tank IO.
+        if (!level.isClientSide) {
+            if (isRoot) {
+                float target = unitsInjected * REACH_PER_UNIT;
+                if (frontPos < target) {
+                    frontPos = Math.min(target, frontPos + FRONT_SPEED);
+                    setChanged();
+                    level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                }
+
+                // Propagate unitsConsumed from the network
+                syncConsumedUnits(level, worldPosition);
+            }
+
+            // Propagate frontPos from neighbors even when not root
+            // This allows orphaned pipes to continue the wave animation
+            propagateFrontPos(level, worldPosition);
+
+            // If this pipe touches a tank, deliver any units whose wave
+            // front has already passed through this block.
+            tryDeliverToAdjacentTank();
+        }
+    }
+
+    /**
+     * Compute minimal distanceFromRoot based on neighbours.
+     * Root has distance 1 by definition.
+     *
+     * Only considers neighbors where we have an actual blockstate connection.
+     */
+    private void updateDistanceFromRoot(Level level, BlockPos pos) {
+        int best = Integer.MAX_VALUE;
+
+        if (isRoot) {
+            best = 1;
+        }
+
+        // Only check connected directions
+        for (Direction dir : Direction.values()) {
+            if (!isConnectedInDirection(dir)) continue;
+
+            BlockPos np = pos.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof FluidPipeBlockEntity other) {
+                int od = other.distanceFromRoot;
+                if (od != Integer.MAX_VALUE) {
+                    best = Math.min(best, od + 1);
+                }
+            }
+        }
+
+        if (best != distanceFromRoot) {
+            // Topology changed - reset delivery counter to allow re-delivery
+            if (prevDistanceFromRoot != Integer.MAX_VALUE && best != prevDistanceFromRoot) {
+                unitsDeliveredToTank = 0;
+            }
+
+            prevDistanceFromRoot = distanceFromRoot;
+            distanceFromRoot = best;
+            setChanged();
+
+            // Sync new distance to the client so rendering updates immediately
+            if (!level.isClientSide) {
+                level.sendBlockUpdated(pos, getBlockState(), getBlockState(), 3);
+            }
+        }
+    }
+
+    /**
+     * Sync consumed units from downstream pipes back to root.
+     * This allows the root to know how much fluid has left the system.
+     *
+     * Only traverses pipes with actual blockstate connections.
+     */
+    private void syncConsumedUnits(Level level, BlockPos pos) {
+        if (!isRoot) return;
+
+        int maxConsumed = 0;
+
+        // Find the maximum unitsDeliveredToTank from any pipe in the network
+        // Only traverse via actual blockstate connections
+        java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+        java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
+
+        queue.add(pos);
+        visited.add(pos);
+
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.poll();
+            BlockEntity be = level.getBlockEntity(current);
+
+            if (be instanceof FluidPipeBlockEntity pipe) {
+                maxConsumed = Math.max(maxConsumed, pipe.unitsDeliveredToTank);
+
+                BlockState currentState = level.getBlockState(current);
+
+                // Only traverse connected directions
+                for (Direction dir : Direction.values()) {
+                    BooleanProperty prop = getPropertyForDirection(dir);
+                    if (!currentState.hasProperty(prop) || !currentState.getValue(prop)) {
+                        continue; // Not connected in this direction
+                    }
+
+                    BlockPos next = current.relative(dir);
+                    if (visited.contains(next)) continue;
+
+                    BlockEntity nextBe = level.getBlockEntity(next);
+                    if (nextBe instanceof FluidPipeBlockEntity) {
+                        visited.add(next);
+                        queue.add(next);
+                    }
+                }
+            }
+        }
+
+        if (maxConsumed != unitsConsumed) {
+            unitsConsumed = maxConsumed;
+            setChanged();
+        }
+    }
+
+    /**
+     * Propagate frontPos and unitsInjected from neighbors.
+     * This ensures that when the root is destroyed, the wave continues
+     * to animate and deliver fluid based on what was already injected.
+     *
+     * Only considers neighbors with actual blockstate connections.
+     */
+    private void propagateFrontPos(Level level, BlockPos pos) {
+        if (isRoot) return; // Root manages its own frontPos
+
+        float bestFrontPos = frontPos;
+        int bestUnitsInjected = unitsInjected;
+        int bestUnitsConsumed = unitsConsumed;
+        boolean foundBetter = false;
+
+        // Only check connected directions
+        for (Direction dir : Direction.values()) {
+            if (!isConnectedInDirection(dir)) continue;
+
+            BlockPos np = pos.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof FluidPipeBlockEntity other) {
+                if (other.distanceFromRoot < this.distanceFromRoot && other.distanceFromRoot != Integer.MAX_VALUE) {
+                    // Inherit from closer neighbor
+                    if (other.frontPos > bestFrontPos || other.unitsInjected > bestUnitsInjected) {
+                        bestFrontPos = other.frontPos;
+                        bestUnitsInjected = other.unitsInjected;
+                        bestUnitsConsumed = other.unitsConsumed;
+                        foundBetter = true;
+                    }
+                }
+            }
+        }
+
+        if (foundBetter) {
+            if (frontPos != bestFrontPos || unitsInjected != bestUnitsInjected || unitsConsumed != bestUnitsConsumed) {
+                frontPos = bestFrontPos;
+                unitsInjected = bestUnitsInjected;
+                unitsConsumed = bestUnitsConsumed;
+                setChanged();
+                level.sendBlockUpdated(pos, getBlockState(), getBlockState(), 3);
+            }
+        }
+    }
+
+    /**
+     * Propagate displayedFluid from root outward.
+     *
+     * Only considers neighbors with actual blockstate connections.
+     */
+    private void propagateFluidType(Level level, BlockPos pos) {
+        FluidStack best = displayedFluid;
+
+        if (isRoot && !displayedFluid.isEmpty()) {
+            best = displayedFluid;
+        }
+
+        // Only check connected directions
+        for (Direction dir : Direction.values()) {
+            if (!isConnectedInDirection(dir)) continue;
+
+            BlockPos np = pos.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof FluidPipeBlockEntity other) {
+                if (other.distanceFromRoot + 1 == this.distanceFromRoot && !other.displayedFluid.isEmpty()) {
+                    // Prefer fluid type from the neighbour closer to the root
+                    best = other.displayedFluid;
+                    break;
+                }
+            }
+        }
+
+        if (!FluidStack.isSameFluidSameComponents(best, this.displayedFluid)) {
+            this.displayedFluid = best.isEmpty() ? FluidStack.EMPTY : best.copy();
+            // If the fluid type changed, reset local delivery tracking so we don't
+            // leak old units into a tank.
+            unitsDeliveredToTank = 0;
 
             setChanged();
-            requestSyncNow();
-            return toTake;
+            if (!level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
         }
-
-        // else spawn brand new section
-        Section s = new Section();
-        s.sourceSection = false;
-        s.fromDir = incomingFrom;
-        s.outDir = pickInitialOutDir(incomingFrom, fromOther.fluid);
-        s.progress = 0f;
-        s.dirSign = +1;
-        s.speed = fromOther.speed;
-
-        int toTake = Math.min(SECTION_CAPACITY, fromOther.amountMb);
-        s.fluid = fromOther.fluid.copyWithAmount(toTake);
-        s.amountMb = toTake;
-
-        sections.add(s);
-        setChanged();
-        requestSyncNow();
-        return toTake;
     }
 
-    /* =========================================================================================
-     * Sync / Save
-     * =========================================================================================
+    /* ---------------------------------------------------------------------- */
+    /* Capacity calculation helpers                                           */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Count how many pipe segments are reachable from this root.
+     * Used to determine total network capacity.
+     *
+     * Only traverses via actual blockstate connections.
      */
+    private int countNetworkSize(Level level, BlockPos startPos) {
+        if (level == null) return 1;
 
-    @Nullable
-    @Override
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
-    }
+        java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+        java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
 
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return this.saveWithoutMetadata(registries);
-    }
+        queue.add(startPos);
+        visited.add(startPos);
 
-    private void requestSyncNow() {
-        if (level == null || level.isClientSide) return;
-        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-    }
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.poll();
+            BlockState currentState = level.getBlockState(current);
 
-    @Override
-    protected void saveAdditional(ValueOutput out) {
-        super.saveAdditional(out);
+            // Only traverse connected directions
+            for (Direction dir : Direction.values()) {
+                BooleanProperty prop = getPropertyForDirection(dir);
+                if (!currentState.hasProperty(prop) || !currentState.getValue(prop)) {
+                    continue; // Not connected in this direction
+                }
 
-        out.putInt("sec_count", sections.size());
+                BlockPos next = current.relative(dir);
+                if (visited.contains(next)) continue;
 
-        for (int i = 0; i < sections.size(); i++) {
-            Section s = sections.get(i);
-            ValueOutput child = out.child("sec_" + i);
-
-            // Store fluid via OPTIONAL_CODEC (same style as tanks)
-            child.store("fluid", FluidStack.OPTIONAL_CODEC, s.fluid);
-
-            child.putInt("amt", s.amountMb);
-            child.putInt("dirSign", s.dirSign);
-            child.putFloat("prog", s.progress);
-            child.putFloat("spd",  s.speed);
-            child.putInt("cut", s.cutHide);
-            child.putBoolean("src", s.sourceSection);
-
-            child.putInt("from", s.fromDir == null ? -1 : s.fromDir.get3DDataValue());
-            child.putInt("out",  s.outDir  == null ? -1 : s.outDir.get3DDataValue());
+                BlockEntity be = level.getBlockEntity(next);
+                if (be instanceof FluidPipeBlockEntity) {
+                    visited.add(next);
+                    queue.add(next);
+                }
+            }
         }
+
+        return visited.size();
     }
 
-    @Override
-    protected void loadAdditional(ValueInput in) {
-        super.loadAdditional(in);
+    /**
+     * Calculate the maximum units this network can hold based on pipe count.
+     */
+    private int getNetworkCapacity(Level level, BlockPos rootPos) {
+        int pipeCount = countNetworkSize(level, rootPos);
+        return pipeCount * MAX_UNITS_PER_PIPE;
+    }
 
-        sections.clear();
+    /* ---------------------------------------------------------------------- */
+    /* Fluid injection (from neighbours)                                      */
+    /* ---------------------------------------------------------------------- */
 
-        int count = in.getInt("sec_count").orElse(0);
-        for (int i = 0; i < count; i++) {
-            Optional<ValueInput> optChild = in.child("sec_" + i);
-            if (optChild.isEmpty()) continue;
-            ValueInput child = optChild.get();
+    /**
+     * Pump / tank / etc. calls fill on this pipe. If the source is NOT another
+     * pipe, we treat this pipe as a root and consider that "one unit of water"
+     * has entered the system, extending the target length by REACH_PER_UNIT pipes.
+     *
+     * Respects network capacity limits based on (unitsInjected - unitsConsumed).
+     */
+    public FluidStack offer(FluidStack stack, Direction from) {
+        if (level == null || stack.isEmpty()) return stack;
 
-            Section s = new Section();
+        BlockPos srcPos = worldPosition.relative(from);
+        BlockEntity srcBe = level.getBlockEntity(srcPos);
+        boolean fromPipe = srcBe instanceof FluidPipeBlockEntity;
 
-            child.read("fluid", FluidStack.OPTIONAL_CODEC).ifPresent(fs -> {
-                s.fluid = fs.copy();
-            });
+        if (!fromPipe) {
+            // This pipe is the root where fluid enters
+            boolean wasRoot = isRoot;
+            isRoot = true;
 
-            s.amountMb = child.getInt("amt").orElse(0);
-            s.dirSign  = child.getInt("dirSign").orElse(+1);
-            s.progress = child.getFloatOr("prog", 0f);
-            s.speed    = child.getFloatOr("spd", BASE_SPEED);
-            s.cutHide  = child.getInt("cut").orElse(0);
-            s.sourceSection = child.getBooleanOr("src", false);
-
-            int fromVal = child.getInt("from").orElse(-1);
-            int outVal  = child.getInt("out").orElse(-1);
-            s.fromDir = (fromVal >= 0 && fromVal < 6) ? Direction.from3DDataValue(fromVal) : null;
-            s.outDir  = (outVal  >= 0 && outVal  < 6) ? Direction.from3DDataValue(outVal)  : null;
-
-            // keep stack's internal amount in sync
-            if (s.fluid != null && !s.fluid.isEmpty()) {
-                s.fluid.setAmount(s.amountMb);
-            } else {
-                s.fluid = FluidStack.EMPTY;
-                s.amountMb = 0;
+            // First time any fluid arrives, define which fluid the column renders
+            if (displayedFluid.isEmpty()) {
+                displayedFluid = new FluidStack(stack.getFluid(), MB_PER_UNIT);
+                unitsDeliveredToTank = 0; // new fluid type → reset local delivery
             }
 
-            sections.add(s);
+            // If we just became a root, reset delivery tracking for fresh start
+            if (!wasRoot) {
+                unitsDeliveredToTank = 0;
+            }
+
+            // Check capacity before accepting fluid
+            // Available capacity = total capacity - (units in system)
+            // Units in system = unitsInjected - unitsConsumed
+            int networkCapacity = getNetworkCapacity(level, worldPosition);
+            int unitsInSystem = unitsInjected - unitsConsumed;
+
+            if (unitsInSystem >= networkCapacity) {
+                // Network is full - reject the fluid
+                return stack;
+            }
+
+            // accumulate millibuckets from the pump
+            int incomingMb = stack.getAmount();
+            injectedMbAccum += incomingMb;
+
+            // how many NEW full "units" (buckets) did we just cross?
+            int newUnits = injectedMbAccum / MB_PER_UNIT;
+
+            if (newUnits > 0) {
+                // Check if adding these units would exceed capacity
+                int unitsToAdd = Math.min(newUnits, networkCapacity - unitsInSystem);
+
+                if (unitsToAdd > 0) {
+                    unitsInjected += unitsToAdd;
+                    int mbConsumed = unitsToAdd * MB_PER_UNIT;
+                    injectedMbAccum -= mbConsumed;
+
+                    // Calculate leftover
+                    int mbRejected = incomingMb - mbConsumed;
+                    if (mbRejected > 0) {
+                        // Ensure animation head starts correctly
+                        if (frontPos < 0f) {
+                            frontPos = 0f;
+                        }
+
+                        setChanged();
+                        if (!level.isClientSide) {
+                            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                        }
+
+                        return new FluidStack(stack.getFluid(), mbRejected);
+                    }
+                } else {
+                    // Can't accept any more units - reject all
+                    injectedMbAccum -= incomingMb; // undo the accumulation
+                    return stack;
+                }
+            }
+
+            // Ensure animation head starts correctly
+            if (frontPos < 0f) {
+                frontPos = 0f;
+            }
+
+            setChanged();
+            if (!level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
+
+            return FluidStack.EMPTY; // accepted all remaining fluid
         }
+
+        // From another pipe - just pass through
+        return FluidStack.EMPTY;
     }
 
-    /* =========================================================================================
-     * Renderer snapshot helpers
-     * =========================================================================================
+    /* ---------------------------------------------------------------------- */
+    /* Tank delivery logic                                                    */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * If this pipe is adjacent to a TankBlockEntity, transfer real fluid
+     * into the tank as the wave passes through this block.
+     *
+     * We count how many full "units" of the wave have traversed this block:
+     *
+     *   unitsPassedHere = floor( head - (distanceFromRoot - 1) )
+     *
+     * and compare that to unitsDeliveredToTank. Whenever unitsPassedHere grows,
+     * we push (deltaUnits * MB_PER_UNIT) mB into the tank.
      */
+    private void tryDeliverToAdjacentTank() {
+        if (level == null) return;
+        if (distanceFromRoot == Integer.MAX_VALUE) return;
+        if (displayedFluid.isEmpty()) return;
 
-    public static final class RenderSection {
-        public final FluidStack fluid;
-        public final float progress;
-        public final Direction outDir;
-        public final boolean hidden;
-        public final int amountMb;
+        // NEW: Only deliver if we're actually on the active flow path
+        if (!isOnActiveFlowPath()) return;
 
-        private RenderSection(FluidStack fluid, float progress, Direction outDir, boolean hidden, int amountMb) {
-            this.fluid = fluid;
-            this.progress = progress;
-            this.outDir = outDir;
-            this.hidden = hidden;
-            this.amountMb = amountMb;
+        // Find a neighbouring tank block entity, if any.
+        TankBlockEntity tankBe = null;
+        for (Direction dir : Direction.values()) {
+            BlockPos np = worldPosition.relative(dir);
+            BlockEntity be = level.getBlockEntity(np);
+            if (be instanceof TankBlockEntity t) {
+                tankBe = t;
+                break;
+            }
         }
+        if (tankBe == null) return;
+
+        float head = getFrontPos();
+        if (head <= 0f) return;
+
+        float segmentStart = distanceFromRoot - 1;
+        float passed = head - segmentStart;
+
+        // Wait for actual wave passage (no early delivery)
+        int unitsPassedHere = (int) Math.floor(passed);
+
+        if (unitsPassedHere <= unitsDeliveredToTank) return;
+
+        int newUnits = unitsPassedHere - unitsDeliveredToTank;
+        int amountMb = newUnits * MB_PER_UNIT;
+
+        IFluidHandler tankHandler = tankBe.getColumnHandler();
+        FluidStack toInsert = new FluidStack(displayedFluid.getFluid(), amountMb);
+
+        int filled = tankHandler.fill(toInsert, IFluidHandler.FluidAction.EXECUTE);
+        if (filled <= 0) return;
+
+        int actualUnits = filled / MB_PER_UNIT;
+        if (actualUnits <= 0) return;
+
+        unitsDeliveredToTank += actualUnits;
+
+        tankBe.setChanged();
+        level.sendBlockUpdated(tankBe.getBlockPos(), tankBe.getBlockState(), tankBe.getBlockState(), 3);
+        level.invalidateCapabilities(tankBe.getBlockPos());
     }
 
-    /** Snapshot for BER. */
-    public List<RenderSection> getRenderSections(int max) {
-        List<RenderSection> list = new ArrayList<>();
-        for (int i = 0; i < sections.size() && list.size() < max; i++) {
-            Section s = sections.get(i);
-            list.add(new RenderSection(
-                    s.fluid.copyWithAmount(s.amountMb),
-                    s.progress,
-                    s.outDir,
-                    s.cutHide > 0,
-                    s.amountMb
-            ));
-        }
-        return list;
-    }
 
-    /* =========================================================================================
-     * Capability access
-     * =========================================================================================
-     */
+    /* ---------------------------------------------------------------------- */
+    /* Capabilities                                                            */
+    /* ---------------------------------------------------------------------- */
 
-    private final class SideFluidHandler implements IFluidHandler {
+    private class SideFluidHandler implements IFluidHandler {
         private final Direction side;
-        SideFluidHandler(Direction side) { this.side = side; }
+
+        SideFluidHandler(Direction side) {
+            this.side = side;
+        }
 
         @Override
         public int getTanks() {
@@ -531,13 +704,17 @@ public class FluidPipeBlockEntity extends BlockEntity {
 
         @Override
         public FluidStack getFluidInTank(int tank) {
-            // pipes don't expose a standing "tank" of fluid to outsiders
             return FluidStack.EMPTY;
         }
 
         @Override
         public int getTankCapacity(int tank) {
-            return SECTION_CAPACITY;
+            // Report actual network capacity
+            if (level != null && isRoot) {
+                int capacity = getNetworkCapacity(level, worldPosition);
+                return capacity * MB_PER_UNIT;
+            }
+            return MAX_UNITS_PER_PIPE * MB_PER_UNIT;
         }
 
         @Override
@@ -547,7 +724,22 @@ public class FluidPipeBlockEntity extends BlockEntity {
 
         @Override
         public int fill(FluidStack resource, FluidAction action) {
-            return tryAcceptFromSide(resource, side, action);
+            if (resource == null || resource.isEmpty()) return 0;
+            if (action.simulate()) {
+                // Simulate capacity check
+                if (level != null && isRoot) {
+                    int networkCapacity = getNetworkCapacity(level, worldPosition);
+                    int unitsInSystem = unitsInjected - unitsConsumed;
+                    int availableUnits = networkCapacity - unitsInSystem;
+                    int availableMb = availableUnits * MB_PER_UNIT;
+                    return Math.min(resource.getAmount(), Math.max(0, availableMb));
+                }
+                return resource.getAmount();
+            }
+
+            FluidStack copy = resource.copy();
+            FluidStack leftover = offer(copy, side);
+            return resource.getAmount() - leftover.getAmount();
         }
 
         @Override
@@ -561,13 +753,55 @@ public class FluidPipeBlockEntity extends BlockEntity {
         }
     }
 
-    /**
-     * Capability lookup helper.
-     * ModCapabilities will hook this into Capabilities.FluidHandler.BLOCK
-     * so other blocks can do level.getCapability(...).
-     */
     @Nullable
     public IFluidHandler getFluidHandlerForSide(Direction side) {
         return sideHandlers.get(side);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Sync / save                                                             */
+    /* ---------------------------------------------------------------------- */
+
+    @Nullable
+    @Override
+    public ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public net.minecraft.nbt.CompoundTag getUpdateTag(HolderLookup.Provider provider) {
+        return this.saveWithoutMetadata(provider);
+    }
+
+    @Override
+    protected void saveAdditional(ValueOutput out) {
+        super.saveAdditional(out);
+        out.putInt("DistanceFromRoot", distanceFromRoot);
+        out.putInt("IsRoot", isRoot ? 1 : 0);
+        out.putInt("UnitsInjected", unitsInjected);
+        out.putInt("UnitsConsumed", unitsConsumed);
+        out.putInt("InjectedMbAccum", injectedMbAccum);
+        out.store("FrontPos", Codec.FLOAT, frontPos);
+        out.putInt("UnitsDeliveredToTank", unitsDeliveredToTank);
+
+        if (!displayedFluid.isEmpty()) {
+            out.store("DisplayedFluid", FluidStack.OPTIONAL_CODEC, displayedFluid);
+        }
+    }
+
+    @Override
+    protected void loadAdditional(ValueInput in) {
+        super.loadAdditional(in);
+        distanceFromRoot = in.getInt("DistanceFromRoot").orElse(Integer.MAX_VALUE);
+        prevDistanceFromRoot = distanceFromRoot; // Initialize prev on load
+        isRoot           = in.getInt("IsRoot").orElse(0) != 0;
+        unitsInjected    = in.getInt("UnitsInjected").orElse(0);
+        unitsConsumed    = in.getInt("UnitsConsumed").orElse(0);
+        injectedMbAccum  = in.getInt("InjectedMbAccum").orElse(0);
+        frontPos         = in.read("FrontPos", Codec.FLOAT).orElse(0f);
+        unitsDeliveredToTank = in.getInt("UnitsDeliveredToTank").orElse(0);
+
+        displayedFluid   = in.read("DisplayedFluid", FluidStack.OPTIONAL_CODEC)
+                .orElse(FluidStack.EMPTY);
     }
 }

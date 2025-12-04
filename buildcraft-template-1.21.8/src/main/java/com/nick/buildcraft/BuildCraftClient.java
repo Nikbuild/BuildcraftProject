@@ -72,7 +72,7 @@ public final class BuildCraftClient {
             //  - We want them drawn like glass rings / frames with holes.
             //  - CUTOUT makes the see-through bits work and lets us see our BER blobs inside.
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.STONE_FLUID_PIPE.get(), ChunkSectionLayer.CUTOUT);
-            ItemBlockRenderTypes.setRenderLayer(ModBlocks.COBBLE_FLUID_PIPE.get(), ChunkSectionLayer.CUTOUT);
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.COBBLESTONE_FLUID_PIPE.get(), ChunkSectionLayer.CUTOUT);
 
             // Pump's hanging hose is *not* a block, so no render layer registration needed.
         });

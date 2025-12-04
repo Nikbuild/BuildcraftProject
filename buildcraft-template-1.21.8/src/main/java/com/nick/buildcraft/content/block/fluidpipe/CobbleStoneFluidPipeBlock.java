@@ -8,9 +8,9 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
  * Classic cobble variant. Same throughput as stone for now but
  * does NOT connect to STONE (handled by canMateWith in base).
  */
-public class CobbleFluidPipeBlock extends BaseFluidPipeBlock {
+public class CobbleStoneFluidPipeBlock extends BaseFluidPipeBlock {
 
-    public CobbleFluidPipeBlock(BlockBehaviour.Properties props) {
+    public CobbleStoneFluidPipeBlock(BlockBehaviour.Properties props) {
         super(PipeFamily.COBBLE, props);
     }
 

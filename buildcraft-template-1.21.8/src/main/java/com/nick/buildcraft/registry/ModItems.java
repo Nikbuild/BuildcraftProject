@@ -64,8 +64,9 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> STONE_FLUID_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("stone_fluid_pipe", ModBlocks.STONE_FLUID_PIPE);
 
-    public static final DeferredItem<BlockItem> COBBLE_FLUID_PIPE_ITEM =
-            ITEMS.registerSimpleBlockItem("cobble_fluid_pipe", ModBlocks.COBBLE_FLUID_PIPE);
+    public static final DeferredItem<BlockItem> COBBLESTONE_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("cobblestone_fluid_pipe", ModBlocks.COBBLESTONE_FLUID_PIPE);
+
 
     /* ---------- Storage / misc machines ---------- */
 

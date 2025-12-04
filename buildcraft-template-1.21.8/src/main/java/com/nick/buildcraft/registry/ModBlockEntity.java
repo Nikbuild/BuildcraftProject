@@ -110,7 +110,7 @@ public final class ModBlockEntity {
                             FluidPipeBlockEntity::new,
                             Set.of(
                                     ModBlocks.STONE_FLUID_PIPE.get(),
-                                    ModBlocks.COBBLE_FLUID_PIPE.get()
+                                    ModBlocks.COBBLESTONE_FLUID_PIPE.get()
                             )
                     )
             );

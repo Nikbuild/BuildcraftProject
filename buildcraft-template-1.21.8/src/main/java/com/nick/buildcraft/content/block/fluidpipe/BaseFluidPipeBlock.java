@@ -31,28 +31,13 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
  * BaseFluidPipeBlock
  *
  * Shared behavior for ALL fluid pipes.
- * Things this class handles:
- *  - 6 connection booleans in blockstate
- *  - voxel shapes (core + arms)
- *  - connection logic to other pipes / tanks
- *  - hide interior faces between connected pipes
- *  - spawn + tick FluidPipeBlockEntity
  *
- * Subclasses (StoneFluidPipeBlock, CobbleFluidPipeBlock, GoldFluidPipeBlock, etc.)
- * only exist to:
- *   - pick the "family" (STONE vs COBBLE)
- *   - customize special rules later (speed boost, valves, filters...)
+ * NEW: Endpoint-only connection logic - pipes can only connect to:
+ *   1. Non-pipe blocks (pumps, tanks, etc.)
+ *   2. The endpoint of another pipe chain (pipes with 0 or 1 existing connections)
  */
 public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
 
-    /**
-     * Like item pipes:
-     *  - STONE and COBBLE do NOT connect directly to each other.
-     *  - GOLD later = faster throughput.
-     *  - IRON later = 1-way valve.
-     *  - DIAMOND later = filter by fluid.
-     *  - WOOD later = suction / extraction.
-     */
     public enum PipeFamily { STONE, COBBLE, GOLD, IRON, DIAMOND, WOOD, GENERIC }
 
     private final PipeFamily family;
@@ -162,44 +147,55 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
             BlockState neighborState,
             RandomSource random
     ) {
-        // tell BE immediately so it can drop/retarget sections
-        if (level instanceof Level lvl && !lvl.isClientSide) {
-            BlockEntity be = lvl.getBlockEntity(pos);
-            if (be instanceof FluidPipeBlockEntity fluidBe) {
-                fluidBe.onNeighborGraphChanged(neighborPos);
-            }
-        }
-
+        // Recompute connection based on endpoint logic
         boolean nowConnected = canConnectTo(level, pos, dir);
         return state.setValue(dirProp(dir), nowConnected);
     }
 
     /* ------------------------------------------------------------ */
-    /* Connectivity rules                                           */
+    /* Connectivity rules (ENDPOINT-ONLY LOGIC)                     */
     /* ------------------------------------------------------------ */
 
     /**
-     * canConnectTo:
-     * - connect to another fluid pipe if families are allowed to mate
-     * - OR connect to a block that exposes a FluidHandler on that face (tank, pump, etc.)
+     * Check if this pipe at selfPos can connect in direction dir.
+     *
+     * Rules:
+     * 1. Always connect to non-pipe blocks (pumps, tanks, etc.) with fluid handlers
+     * 2. Connect to another pipe ONLY IF:
+     *    a) This pipe has 0 or 1 existing connections (is an endpoint)
+     *    b) The target pipe has 0 or 1 existing connections (is an endpoint)
      */
     protected boolean canConnectTo(LevelReader level, BlockPos selfPos, Direction dir) {
-        BlockPos np = selfPos.relative(dir);
-        BlockState otherState = level.getBlockState(np);
+        BlockPos neighborPos = selfPos.relative(dir);
+        BlockState neighborState = level.getBlockState(neighborPos);
 
-        // fluid pipe neighbor?
-        if (otherState.getBlock() instanceof BaseFluidPipeBlock otherPipe) {
-            return this.canMateWith(otherPipe) && otherPipe.canMateWith(this);
+        // Case 1: Neighbor is another fluid pipe
+        if (neighborState.getBlock() instanceof BaseFluidPipeBlock otherPipe) {
+            // Check family compatibility first
+            if (!this.canMateWith(otherPipe) || !otherPipe.canMateWith(this)) {
+                return false;
+            }
+
+            // NEW: Endpoint-only connection logic
+            // Count how many connections this pipe currently has
+            int selfConnections = countExistingConnections(level, selfPos, dir);
+
+            // Count how many connections the neighbor pipe has
+            int neighborConnections = countExistingConnections(level, neighborPos, dir.getOpposite());
+
+            // Both pipes must be endpoints (0 or 1 existing connection) to connect
+            return selfConnections <= 1 && neighborConnections <= 1;
         }
 
-        // machine / tank / pump exposing IFluidHandler on that face?
+        // Case 2: Neighbor is a machine/tank/pump with IFluidHandler
         if (level instanceof Level lvl) {
             IFluidHandler handler = lvl.getCapability(
                     Capabilities.FluidHandler.BLOCK,
-                    np,
+                    neighborPos,
                     dir.getOpposite()
             );
             if (handler != null) {
+                // Always allow connection to non-pipe fluid handlers
                 return true;
             }
         }
@@ -208,11 +204,37 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
     }
 
     /**
-     * By default:
-     *  - STONE <-> COBBLE is forbidden (classic BC "stone vs cobble don't mix")
-     *  - everything else is fine
+     * Count how many connections this pipe already has (excluding the checkDir).
      *
-     * Subclasses can override this for iron/wood/diamond behavior later.
+     * @param level The level
+     * @param pos Position of the pipe to check
+     * @param excludeDir Direction to exclude from count (the direction we're checking for new connection)
+     * @return Number of existing connections (0, 1, 2, 3, 4, 5, or 6)
+     */
+    private int countExistingConnections(LevelReader level, BlockPos pos, Direction excludeDir) {
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof BaseFluidPipeBlock)) {
+            return 0;
+        }
+
+        int count = 0;
+
+        for (Direction dir : Direction.values()) {
+            // Skip the direction we're currently checking
+            if (dir == excludeDir) continue;
+
+            BooleanProperty prop = dirProp(dir);
+            if (state.hasProperty(prop) && state.getValue(prop)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Check if two pipe families can connect together.
+     * Stone and Cobble pipes cannot mate with each other.
      */
     protected boolean canMateWith(BaseFluidPipeBlock other) {
         boolean stoneCobbleMismatch =
@@ -221,6 +243,9 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
         return !stoneCobbleMismatch;
     }
 
+    /**
+     * Helper to map Direction to the corresponding BooleanProperty.
+     */
     private static BooleanProperty dirProp(Direction d) {
         return switch (d) {
             case NORTH -> NORTH;
@@ -239,7 +264,7 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        // Shared BE type for ALL fluid pipes (like STONE_PIPE for item pipes)
+        // Shared BE type for ALL fluid pipes
         return ModBlockEntity.FLUID_PIPE.get().create(pos, state);
     }
 

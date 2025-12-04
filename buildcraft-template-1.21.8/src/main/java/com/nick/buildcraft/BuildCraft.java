@@ -52,7 +52,7 @@ public class BuildCraft {
 
                                 // Fluid Pipes
                                 out.accept(ModItems.STONE_FLUID_PIPE_ITEM.get());
-                                out.accept(ModItems.COBBLE_FLUID_PIPE_ITEM.get());
+                                out.accept(ModItems.COBBLESTONE_FLUID_PIPE_ITEM.get());
 
                                 // Mining Well (pipe segment has no separate item form)
                                 out.accept(ModItems.MINING_WELL_ITEM.get());
@@ -124,7 +124,7 @@ public class BuildCraft {
 
             // Fluid pipes
             event.accept(ModItems.STONE_FLUID_PIPE_ITEM);
-            event.accept(ModItems.COBBLE_FLUID_PIPE_ITEM);
+            event.accept(ModItems.COBBLESTONE_FLUID_PIPE_ITEM);
 
             // Mining Well
             event.accept(ModItems.MINING_WELL_ITEM);

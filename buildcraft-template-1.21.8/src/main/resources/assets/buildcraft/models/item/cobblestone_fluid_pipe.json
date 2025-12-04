@@ -1,0 +1,55 @@
+{
+  "parent": "minecraft:block/block",
+  "gui_light": "front",
+  "textures": {
+    "all": "buildcraft:block/fluidpipetextures/pipefluidscobblestone",
+    "particle": "buildcraft:block/fluidpipetextures/pipefluidscobblestone"
+  },
+  "elements": [
+    {
+      "from": [4, 0, 4],
+      "to": [12, 4, 12],
+      "faces": {
+        "up": { "texture": "#all" },
+        "down": { "texture": "#all" },
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" }
+      }
+    },
+    {
+      "from": [4, 4, 4],
+      "to": [12, 12, 12],
+      "faces": {
+        "up": { "texture": "#all" },
+        "down": { "texture": "#all" },
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" }
+      }
+    },
+    {
+      "from": [4, 12, 4],
+      "to": [12, 16, 12],
+      "faces": {
+        "up": { "texture": "#all" },
+        "down": { "texture": "#all" },
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" }
+      }
+    }
+  ],
+  "display": {
+    "gui": { "rotation": [30, 225, 0], "translation": [0.0, 0.0, 0], "scale": [0.80, 0.80, 0.80] },
+    "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.90, 0.90, 0.90] },
+    "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.50, 0.50, 0.50] },
+    "firstperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.80, 0.80, 0.80] },
+    "firstperson_lefthand": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.80, 0.80, 0.80] },
+    "thirdperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 2.5, 0], "scale": [0.55, 0.55, 0.55] },
+    "thirdperson_lefthand": { "rotation": [0, 0, 0], "translation": [0, 2.5, 0], "scale": [0.55, 0.55, 0.55] }
+  }
+}

@@ -5,7 +5,7 @@ import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
-import com.nick.buildcraft.content.block.fluidpipe.CobbleFluidPipeBlock;
+import com.nick.buildcraft.content.block.fluidpipe.CobbleStoneFluidPipeBlock;
 import com.nick.buildcraft.content.block.fluidpipe.StoneFluidPipeBlock;
 import com.nick.buildcraft.content.block.miningwell.MiningPipeBlock;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlock;
@@ -214,9 +214,9 @@ public final class ModBlocks {
             )
     );
 
-    public static final DeferredBlock<Block> COBBLE_FLUID_PIPE = BLOCKS.register(
-            "cobble_fluid_pipe",
-            () -> new CobbleFluidPipeBlock(
+    public static final DeferredBlock<Block> COBBLESTONE_FLUID_PIPE = BLOCKS.register(
+            "cobblestone_fluid_pipe",
+            () -> new CobbleStoneFluidPipeBlock(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.STONE)
                             .noOcclusion()
@@ -225,11 +225,12 @@ public final class ModBlocks {
                                     Registries.BLOCK,
                                     ResourceLocation.fromNamespaceAndPath(
                                             BuildCraft.MODID,
-                                            "cobble_fluid_pipe"
+                                            "cobblestone_fluid_pipe"
                                     )
                             ))
             )
     );
+
 
     /* --------------------------------------------------------------------- */
     /* Engines                                                                */

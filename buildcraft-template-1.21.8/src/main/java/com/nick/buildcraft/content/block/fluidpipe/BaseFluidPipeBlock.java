@@ -4,6 +4,8 @@ import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -35,6 +37,8 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
  * NEW: Endpoint-only connection logic - pipes can only connect to:
  *   1. Non-pipe blocks (pumps, tanks, etc.)
  *   2. The endpoint of another pipe chain (pipes with 0 or 1 existing connections)
+ *
+ * 🔥 ANTI-REFILL FIX: Added placement hook to ensure new pipes start empty
  */
 public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
 
@@ -134,6 +138,35 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
                 .setValue(WEST,  canConnectTo(level, pos, Direction.WEST))
                 .setValue(UP,    canConnectTo(level, pos, Direction.UP))
                 .setValue(DOWN,  canConnectTo(level, pos, Direction.DOWN));
+    }
+
+    /**
+     * 🔥 ANTI-REFILL FIX: Override setPlacedBy to ensure complete state reset
+     *
+     * This is called when a player places the block. We use it to guarantee
+     * that the newly placed pipe starts with completely empty fluid state,
+     * preventing any NBT data from a previously broken pipe from being restored.
+     */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state,
+                            @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+
+        if (!level.isClientSide) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof FluidPipeBlockEntity pipe) {
+                // Force complete state reset
+                // This prevents:
+                // 1. NBT data on item from being loaded
+                // 2. Any residual state from chunk loading
+                // 3. Wave interference from immediate neighbor propagation
+                pipe.clearAllFluidState();
+                pipe.setChanged();
+
+                // Sync to client so renderer knows pipe is empty
+                level.sendBlockUpdated(pos, state, state, 3);
+            }
+        }
     }
 
     @Override

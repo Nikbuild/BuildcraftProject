@@ -5,8 +5,7 @@ import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import com.nick.buildcraft.content.block.engine.MovingEngineRingBlock;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;
-import com.nick.buildcraft.content.block.fluidpipe.CobbleStoneFluidPipeBlock;
-import com.nick.buildcraft.content.block.fluidpipe.StoneFluidPipeBlock;
+import com.nick.buildcraft.content.block.fluidpipe.*;
 import com.nick.buildcraft.content.block.miningwell.MiningPipeBlock;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlock;
 import com.nick.buildcraft.content.block.pipe.CobblePipeBlock;
@@ -213,6 +212,75 @@ public final class ModBlocks {
                             ))
             )
     );
+
+    public static final DeferredBlock<Block> WOOD_FLUID_PIPE = BLOCKS.register(
+            "wood_fluid_pipe",
+            () -> new WoodFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.WOOD)
+                            .noOcclusion()
+                            .strength(1.0F, 3.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "wood_fluid_pipe"
+                                    )
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> IRON_FLUID_PIPE = BLOCKS.register(
+            "iron_fluid_pipe",
+            () -> new IronFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .noOcclusion()
+                            .strength(2.0F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "iron_fluid_pipe"
+                                    )
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> GOLD_FLUID_PIPE = BLOCKS.register(
+            "gold_fluid_pipe",
+            () -> new GoldFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_YELLOW)
+                            .noOcclusion()
+                            .strength(1.5F, 6.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "gold_fluid_pipe"
+                                    )
+                            ))
+            )
+    );
+
+    public static final DeferredBlock<Block> DIAMOND_FLUID_PIPE = BLOCKS.register(
+            "diamond_fluid_pipe",
+            () -> new DiamondFluidPipeBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.DIAMOND)
+                            .noOcclusion()
+                            .strength(3.0F, 9.0F)
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "diamond_fluid_pipe"
+                                    )
+                            ))
+            )
+    );
+
 
     public static final DeferredBlock<Block> COBBLESTONE_FLUID_PIPE = BLOCKS.register(
             "cobblestone_fluid_pipe",

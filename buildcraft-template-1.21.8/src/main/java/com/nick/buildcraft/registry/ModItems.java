@@ -67,6 +67,17 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> COBBLESTONE_FLUID_PIPE_ITEM =
             ITEMS.registerSimpleBlockItem("cobblestone_fluid_pipe", ModBlocks.COBBLESTONE_FLUID_PIPE);
 
+    public static final DeferredItem<BlockItem> WOOD_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("wood_fluid_pipe", ModBlocks.WOOD_FLUID_PIPE);
+
+    public static final DeferredItem<BlockItem> IRON_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("iron_fluid_pipe", ModBlocks.IRON_FLUID_PIPE);
+
+    public static final DeferredItem<BlockItem> GOLD_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("gold_fluid_pipe", ModBlocks.GOLD_FLUID_PIPE);
+
+    public static final DeferredItem<BlockItem> DIAMOND_FLUID_PIPE_ITEM =
+            ITEMS.registerSimpleBlockItem("diamond_fluid_pipe", ModBlocks.DIAMOND_FLUID_PIPE);
 
     /* ---------- Storage / misc machines ---------- */
 

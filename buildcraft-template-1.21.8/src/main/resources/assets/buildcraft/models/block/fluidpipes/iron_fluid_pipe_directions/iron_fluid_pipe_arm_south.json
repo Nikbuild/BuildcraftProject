@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout_mipped",
+  "textures": {
+    "all": "buildcraft:block/fluidpipetextures/pipefluidsiron",
+    "particle": "buildcraft:block/fluidpipetextures/pipefluidsiron"
+  },
+  "elements": [
+    {
+      "from": [4, 4, 12],
+      "to": [12, 12, 16],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" },
+        "up": { "texture": "#all" },
+        "down": { "texture": "#all" }
+      }
+    }
+  ]
+}

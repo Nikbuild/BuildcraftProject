@@ -1,0 +1,12 @@
+{
+  "multipart": [
+    { "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_core" }},
+
+    { "when": { "north": "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_north" }},
+    { "when": { "south": "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_south" }},
+    { "when": { "west":  "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_west" }},
+    { "when": { "east":  "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_east" }},
+    { "when": { "up":    "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_up" }},
+    { "when": { "down":  "true" }, "apply": { "model": "buildcraft:block/fluidpipes/diamond_fluid_pipe_directions/diamond_fluid_pipe_arm_down" }}
+  ]
+}

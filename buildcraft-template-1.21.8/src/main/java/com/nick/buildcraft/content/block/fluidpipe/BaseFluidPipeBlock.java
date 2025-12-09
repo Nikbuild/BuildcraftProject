@@ -39,6 +39,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
  *   2. The endpoint of another pipe chain (pipes with 0 or 1 existing connections)
  *
  * 🔥 ANTI-REFILL FIX: Added placement hook to ensure new pipes start empty
+ * 🔥 CHECKPOINT RECOVERY FIX: Disable virgin grace period when resuming from checkpoints
  */
 public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
 
@@ -141,11 +142,16 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
     }
 
     /**
-     * 🔥 ANTI-REFILL FIX: Override setPlacedBy to ensure complete state reset
+     * 🔥 ANTI-REFILL FIX + 🔥 CHECKPOINT RECOVERY FIX
      *
-     * This is called when a player places the block. We use it to guarantee
-     * that the newly placed pipe starts with completely empty fluid state,
-     * preventing any NBT data from a previously broken pipe from being restored.
+     * This is called when a player places the block. We use it to:
+     * 1. Ensure the newly placed pipe starts with completely empty fluid state
+     * 2. Disable virgin grace period if the pipe is being placed in a network with checkpoints
+     *
+     * The virgin grace period (40 ticks) normally prevents a newly placed pipe from receiving
+     * fluid immediately. This is useful in most cases, but when replacing a broken pipe in a
+     * chain with checkpoints downstream, we want the wave to flow through immediately so that
+     * only 2 buckets are needed (1 to fill the gap, 1 to trigger auto-dump) instead of 4+.
      */
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state,
@@ -161,6 +167,20 @@ public abstract class BaseFluidPipeBlock extends Block implements EntityBlock {
                 // 2. Any residual state from chunk loading
                 // 3. Wave interference from immediate neighbor propagation
                 pipe.clearAllFluidState();
+
+                // 🔥 NEW: Check if we're placing this pipe in a network with checkpoints
+                // If so, disable virgin grace period to allow immediate wave flow
+                FluidPipeBlockEntity root = PipeNetworkFinder.findExistingRoot(pipe);
+                if (root != null) {
+                    int checkpointPos = PipeWaveRecovery.scanFurthestFilledPipe(root);
+                    if (checkpointPos > 0) {
+                        // We're in a network with checkpoints downstream
+                        // Disable virgin grace so wave can flow immediately
+                        pipe.isVirginPipe = false;
+                        pipe.virginTicksRemaining = 0;
+                    }
+                }
+
                 pipe.setChanged();
 
                 // Sync to client so renderer knows pipe is empty

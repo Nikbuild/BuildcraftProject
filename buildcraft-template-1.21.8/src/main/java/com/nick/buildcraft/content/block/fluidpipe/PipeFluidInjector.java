@@ -43,11 +43,34 @@ public class PipeFluidInjector {
             int newUnits = pipe.injectedMbAccum / 1000;
 
             if (newUnits > 0) {
-                int checkpointBasedPosition = PipeWaveRecovery.scanFurthestFilledPipe(pipe);
+                // NEW SEQUENTIAL GAP-FILLING LOGIC
+                // Instead of jumping to the furthest checkpoint, we find and fill
+                // the NEAREST unfilled gap. This creates realistic plumbing behavior
+                // where you must fill gaps sequentially from root outward.
 
-                if (pipe.unitsInjected == 0 && pipe.unitsConsumed == 0 && checkpointBasedPosition > 0) {
-                    pipe.unitsInjected = checkpointBasedPosition;
-                    pipe.frontPos = checkpointBasedPosition;
+                // Check if system has any checkpoints before applying gap-fill logic
+                int nearestGap = PipeSegmentTracker.findNearestUnfilledGap(pipe);
+                int furthestCheckpoint = PipeWaveRecovery.scanFurthestFilledPipe(pipe);
+                boolean hasCheckpoints = (nearestGap > 0 || furthestCheckpoint > 0);
+
+                if (pipe.unitsInjected == 0 && pipe.unitsConsumed == 0 && hasCheckpoints) {
+                    if (nearestGap > 0) {
+                        // There's a gap to fill - target the nearest gap
+                        pipe.unitsInjected = nearestGap;
+                        pipe.frontPos = nearestGap;
+
+                        // Calculate consumed units accounting for filled checkpoints
+                        // Consumed = (target position) - (number of unfilled gaps before target)
+                        int unfilledGaps = PipeSegmentTracker.countUnfilledGaps(pipe);
+                        pipe.unitsConsumed = nearestGap - unfilledGaps;
+                    } else if (furthestCheckpoint > 0) {
+                        // No gaps - resume from furthest checkpoint normally
+                        pipe.unitsInjected = furthestCheckpoint;
+                        pipe.frontPos = furthestCheckpoint;
+
+                        int unfilledGaps = PipeSegmentTracker.countUnfilledGaps(pipe);
+                        pipe.unitsConsumed = furthestCheckpoint - unfilledGaps;
+                    }
                 }
 
                 int unitsToAdd = Math.min(newUnits, networkCapacity - unitsInSystem);
@@ -59,6 +82,22 @@ public class PipeFluidInjector {
                     int actualAdded = pipe.unitsInjected - beforeInjected;
                     if (actualAdded != unitsToAdd) {
                         pipe.unitsInjected = beforeInjected + unitsToAdd;
+                    }
+
+                    // NEW: Auto-advance to next gap when current gap is filled
+                    // This creates the sequential "skip to next empty pipe" behavior
+                    // ONLY applies when we have checkpoints (not a fresh system)
+                    if (hasCheckpoints) {
+                        int currentTarget = (int)pipe.frontPos;
+                        if (pipe.unitsInjected >= currentTarget + 1) {
+                            // Current gap is now filled, check for next gap
+                            int nextGap = PipeSegmentTracker.findNearestUnfilledGap(pipe);
+                            if (nextGap > currentTarget) {
+                                // Jump to next unfilled gap
+                                pipe.unitsInjected = nextGap;
+                                pipe.frontPos = nextGap;
+                            }
+                        }
                     }
 
                     pipe.pumpPushingThisTick = true;

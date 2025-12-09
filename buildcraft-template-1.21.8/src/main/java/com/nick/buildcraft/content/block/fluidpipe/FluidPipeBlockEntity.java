@@ -194,6 +194,33 @@ public class FluidPipeBlockEntity extends BlockEntity {
             pumpPushingThisTick = false;
         }
 
+        // CRITICAL: Update distance FIRST before any virgin grace checks
+        // This ensures we know our position in the network
+        PipeDistanceUpdater.updateDistanceFromRoot(this);
+
+        // 🔥 CHECKPOINT RECOVERY FIX
+        // Auto-disable virgin grace if we're being placed in a gap with checkpoints downstream
+        // This allows immediate wave flow when replacing a broken pipe in a checkpoint chain
+        if (isVirginPipe && virginTicksRemaining > 0 && !level.isClientSide) {
+            // Only check if we have a valid distance (not orphaned)
+            if (distanceFromRoot != Integer.MAX_VALUE) {
+                FluidPipeBlockEntity root = PipeNetworkFinder.findExistingRoot(this);
+                if (root != null && !root.equals(this)) {
+                    // Scan for checkpoints in the network
+                    int checkpointPos = PipeWaveRecovery.scanFurthestFilledPipe(root);
+
+                    // If there are checkpoints downstream of our position, we're filling a gap
+                    // Disable virgin grace to allow wave to flow through immediately
+                    if (checkpointPos > this.distanceFromRoot) {
+                        isVirginPipe = false;
+                        virginTicksRemaining = 0;
+                        setChanged();
+                    }
+                }
+            }
+        }
+
+        // Normal virgin grace countdown
         if (isVirginPipe && virginTicksRemaining > 0) {
             virginTicksRemaining--;
             if (virginTicksRemaining <= 0) {
@@ -201,7 +228,6 @@ public class FluidPipeBlockEntity extends BlockEntity {
             }
         }
 
-        PipeDistanceUpdater.updateDistanceFromRoot(this);
         PipeWavePropagator.propagateFluidType(this);
 
         if (!level.isClientSide) {

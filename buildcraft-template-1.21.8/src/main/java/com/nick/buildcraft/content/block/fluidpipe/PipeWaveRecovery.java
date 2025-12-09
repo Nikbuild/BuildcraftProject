@@ -38,67 +38,15 @@ public class PipeWaveRecovery {
         }
     }
 
+    /**
+     * UPDATED: Now uses the MASTER SEGMENT TRACKER to find furthest filled pipe.
+     *
+     * The master tracker is the overlord that sees the whole physical network
+     * and tells us where to resume, skipping over gaps.
+     */
     public static int scanFurthestFilledPipe(FluidPipeBlockEntity start) {
-        Level level = start.getLevel();
-        if (level == null) return 0;
-
-        Set<BlockPos> visited = new HashSet<>();
-        Map<Integer, FluidPipeBlockEntity> pipesByDistance = new HashMap<>();
-        Queue<BlockPos> queue = new LinkedList<>();
-
-        queue.add(start.getBlockPos());
-        visited.add(start.getBlockPos());
-
-        while (!queue.isEmpty()) {
-            BlockPos current = queue.poll();
-            BlockEntity be = level.getBlockEntity(current);
-
-            if (be instanceof FluidPipeBlockEntity pipe) {
-
-                int d = pipe.getDistanceFromRoot();
-                if (d != Integer.MAX_VALUE) {
-                    pipesByDistance.put(d, pipe);
-                }
-
-                for (Direction dir : Direction.values()) {
-                    if (!pipe.isConnected(dir)) continue;
-
-                    BlockPos next = current.relative(dir);
-                    if (visited.contains(next)) continue;
-
-                    BlockEntity nextBe = level.getBlockEntity(next);
-                    if (nextBe instanceof FluidPipeBlockEntity) {
-                        visited.add(next);
-                        queue.add(next);
-                    }
-                }
-            }
-        }
-
-        int consecutive = 0;
-
-        FluidPipeBlockEntity rootPipe = pipesByDistance.get(1);
-        if (rootPipe != null) {
-            boolean filled = (rootPipe.hasCheckpoint && rootPipe.checkpointAmount > 0)
-                    || rootPipe.unitsInjected > 0;
-
-            if (!filled) return 0;
-            consecutive = 1;
-        }
-
-        for (int dist = 2; dist <= pipesByDistance.size() + 1; dist++) {
-            FluidPipeBlockEntity pipe = pipesByDistance.get(dist);
-            if (pipe == null) break;
-
-            boolean filled = (pipe.hasCheckpoint && pipe.checkpointAmount > 0)
-                    || pipe.unitsInjected > 0;
-
-            if (filled && dist == consecutive + 1) {
-                consecutive = dist;
-            } else break;
-        }
-
-        return consecutive;
+        // Use the master segment tracker - it knows everything!
+        return PipeSegmentTracker.getMasterInjectionTarget(start);
     }
 
     public static void clearCacheInNetwork(FluidPipeBlockEntity start) {

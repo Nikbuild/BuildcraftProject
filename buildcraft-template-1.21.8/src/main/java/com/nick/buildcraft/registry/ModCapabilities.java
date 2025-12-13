@@ -4,6 +4,8 @@ import com.nick.buildcraft.content.block.fluidpipe.FluidPipeBlockEntity;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlockEntity;
 import com.nick.buildcraft.content.block.pump.PumpBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
+import com.nick.buildcraft.content.block.refinery.RefineryBlock;
+import com.nick.buildcraft.content.block.refinery.RefineryBlockEntity;
 import com.nick.buildcraft.content.block.tank.TankBlockEntity;
 import net.minecraft.core.Direction;
 import net.neoforged.bus.api.IEventBus;
@@ -111,6 +113,58 @@ public final class ModCapabilities {
                     if (side == null) return null;
                     return be.getFluidHandlerForSide(side);
                 }
+        );
+
+        /* ------------------------------------------------------------------
+         * REFINERY
+         * ------------------------------------------------------------------ */
+
+        // Register dummy energy capability so engines can detect and auto-rotate to refineries
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                ModBlockEntity.REFINERY.get(),
+                (RefineryBlockEntity be, @Nullable Direction side) -> {
+                    // Return a dummy energy storage that accepts 0 energy
+                    // This is just for engine auto-rotation detection
+                    return new net.neoforged.neoforge.energy.IEnergyStorage() {
+                        @Override
+                        public int receiveEnergy(int maxReceive, boolean simulate) {
+                            return 0; // Don't actually accept energy
+                        }
+
+                        @Override
+                        public int extractEnergy(int maxExtract, boolean simulate) {
+                            return 0;
+                        }
+
+                        @Override
+                        public int getEnergyStored() {
+                            return 0;
+                        }
+
+                        @Override
+                        public int getMaxEnergyStored() {
+                            return 0;
+                        }
+
+                        @Override
+                        public boolean canExtract() {
+                            return false;
+                        }
+
+                        @Override
+                        public boolean canReceive() {
+                            return true; // THIS is what makes engines detect it!
+                        }
+                    };
+                }
+        );
+
+        // Register fluid handler capability for bucket interactions
+        event.registerBlockEntity(
+                Capabilities.FluidHandler.BLOCK,
+                ModBlockEntity.REFINERY.get(),
+                (RefineryBlockEntity be, @Nullable Direction side) -> be.getFluidHandlerForSide(side)
         );
     }
 }

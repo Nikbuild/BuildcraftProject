@@ -18,6 +18,7 @@ import com.nick.buildcraft.content.block.pump.PumpBlock;
 import com.nick.buildcraft.content.block.pump.PumpTubeSegmentBlock;
 import com.nick.buildcraft.content.block.quarry.FrameBlock;
 import com.nick.buildcraft.content.block.quarry.QuarryBlock;
+import com.nick.buildcraft.content.block.refinery.RefineryBlock;
 import com.nick.buildcraft.content.block.tank.TankBlock;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -436,6 +437,29 @@ public final class ModBlocks {
                             ))
             )
     );
+
+    /* --------------------------------------------------------------------- */
+    /* Refinery                                                             */
+    /* --------------------------------------------------------------------- */
+
+    public static final DeferredBlock<Block> REFINERY = BLOCKS.register(
+            "refinery",
+            () -> new RefineryBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .strength(3.0F, 6.0F)
+                            .noOcclusion()      // <--- FIXES SEE-THROUGH ISSUE
+                            .setId(ResourceKey.create(
+                                    Registries.BLOCK,
+                                    ResourceLocation.fromNamespaceAndPath(
+                                            BuildCraft.MODID,
+                                            "refinery"
+                                    )
+                            ))
+            )
+    );
+
+
 
     /* --------------------------------------------------------------------- */
     /* Pump machine + its visual-only hose segments                          */

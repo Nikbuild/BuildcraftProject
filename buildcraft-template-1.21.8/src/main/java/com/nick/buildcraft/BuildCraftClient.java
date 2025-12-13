@@ -6,6 +6,7 @@ import com.nick.buildcraft.client.render.LaserEntityRenderer;
 import com.nick.buildcraft.client.render.MiningWellRenderer;
 import com.nick.buildcraft.client.render.PumpRenderer;
 import com.nick.buildcraft.client.render.QuarryRenderer;
+import com.nick.buildcraft.client.render.RefineryRenderer;
 import com.nick.buildcraft.client.render.StonePipeRenderer;
 import com.nick.buildcraft.client.screen.DiamondPipeScreen;
 import com.nick.buildcraft.client.screen.StirlingEngineScreen;
@@ -81,7 +82,7 @@ public final class BuildCraftClient {
     @SubscribeEvent
     static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.STIRLING_ENGINE.get(), StirlingEngineScreen::new);
-        event.register(ModMenus.DIAMOND_PIPE.get(),  DiamondPipeScreen::new);
+        event.register(ModMenus.DIAMOND_PIPE.get(), DiamondPipeScreen::new);
     }
 
     @SubscribeEvent
@@ -137,6 +138,13 @@ public final class BuildCraftClient {
                 ModBlockEntity.PUMP.get(),
                 PumpRenderer::new
         );
+
+        // Refinery: renders animated magnets with vertical offset based on animation state
+        event.registerBlockEntityRenderer(
+                ModBlockEntity.REFINERY.get(),
+                RefineryRenderer::new
+        );
+
     }
 
     /**

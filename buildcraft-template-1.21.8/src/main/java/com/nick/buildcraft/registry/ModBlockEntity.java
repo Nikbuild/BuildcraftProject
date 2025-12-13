@@ -14,6 +14,8 @@ import com.nick.buildcraft.content.block.pipe.DiamondPipeBlockEntity;
 import com.nick.buildcraft.content.block.pipe.StonePipeBlockEntity;
 import com.nick.buildcraft.content.block.pump.PumpBlockEntity;
 import com.nick.buildcraft.content.block.quarry.QuarryBlockEntity;
+import com.nick.buildcraft.content.block.refinery.RefineryBlockEntity;
+import com.nick.buildcraft.content.block.refinery.RefineryMagnetMovingBlockEntity;
 import com.nick.buildcraft.content.block.tank.TankBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -180,6 +182,38 @@ public final class ModBlockEntity {
                     () -> new BlockEntityType<>(
                             TankBlockEntity::new,
                             Set.of(ModBlocks.TANK.get())
+                    )
+            );
+
+    /* --------------------------------------------------------------------- */
+    /* Refinery                                                              */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * Refinery block entity:
+     * - Manages animation state for reciprocating magnet motion
+     * - Tracks animationStage (0-300) and animationSpeed (1.0-5.0)
+     * - Calculates magnet offsets for rendering
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RefineryBlockEntity>> REFINERY =
+            BLOCK_ENTITY_TYPES.register(
+                    "refinery",
+                    () -> new BlockEntityType<>(
+                            RefineryBlockEntity::new,
+                            Set.of(ModBlocks.REFINERY.get())
+                    )
+            );
+
+    /**
+     * Temporary moving magnet BE for piston-style collision and entity pushing.
+     * Only exists during active magnet movement animation.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RefineryMagnetMovingBlockEntity>> REFINERY_MAGNET_MOVING =
+            BLOCK_ENTITY_TYPES.register(
+                    "refinery_magnet_moving",
+                    () -> new BlockEntityType<>(
+                            RefineryMagnetMovingBlockEntity::new,
+                            Set.of()  // This block type is created dynamically, not placed normally
                     )
             );
 

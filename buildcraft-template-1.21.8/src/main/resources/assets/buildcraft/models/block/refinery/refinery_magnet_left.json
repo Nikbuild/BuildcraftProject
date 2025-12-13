@@ -1,0 +1,22 @@
+{
+  "ambientocclusion": false,
+  "render_type": "solid",
+  "textures": {
+    "magnet": "minecraft:block/iron_block",
+    "particle": "minecraft:block/iron_block"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 8],
+      "to": [4, 4, 16],
+      "faces": {
+        "north": {"texture": "#magnet", "uv": [0, 0, 4, 4]},
+        "south": {"texture": "#magnet", "uv": [0, 0, 4, 4]},
+        "east": {"texture": "#magnet", "uv": [0, 0, 8, 4]},
+        "west": {"texture": "#magnet", "uv": [0, 0, 8, 4]},
+        "up": {"texture": "#magnet", "uv": [0, 0, 4, 8]},
+        "down": {"texture": "#magnet", "uv": [0, 0, 4, 8]}
+      }
+    }
+  ]
+}

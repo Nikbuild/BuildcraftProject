@@ -3,6 +3,7 @@
   "values": [
     "buildcraft:wood_pipe",
     "buildcraft:blockstate_quarry_controller",
+    "buildcraft:refinery",
     "minecraft:furnace",
     "minecraft:chest",
     "minecraft:hopper"

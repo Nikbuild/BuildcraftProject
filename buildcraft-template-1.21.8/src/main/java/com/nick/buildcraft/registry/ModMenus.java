@@ -24,4 +24,9 @@ public final class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<DiamondPipeMenu>> DIAMOND_PIPE =
             MENUS.register("diamond_pipe",
                     () -> IMenuTypeExtension.create((id, inv, buf) -> new DiamondPipeMenu(id, inv, buf)));
+
+    // ---------------------------------------------------------------------
+    // Refinery Menu
+    // ---------------------------------------------------------------------
+
 }

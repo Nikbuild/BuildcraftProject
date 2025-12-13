@@ -41,6 +41,7 @@ public class BuildCraft {
                             .displayItems((params, out) -> {
                                 // Machines
                                 out.accept(ModItems.QUARRY_CONTROLLER_ITEM.get());
+                                out.accept(ModItems.MODEL_ITEM_REFINERY.get());
 
                                 // Item Pipes
                                 out.accept(ModItems.STONE_PIPE_ITEM.get());
@@ -117,6 +118,7 @@ public class BuildCraft {
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(ModItems.QUARRY_CONTROLLER_ITEM);
+            event.accept(ModItems.MODEL_ITEM_REFINERY);
 
             // Item pipes
             event.accept(ModItems.STONE_PIPE_ITEM);

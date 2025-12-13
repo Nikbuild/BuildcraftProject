@@ -1,0 +1,24 @@
+{
+  "multipart": [
+    { "when": { "part": "base", "facing": "north" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined", "y": 0 } },
+    { "when": { "part": "base", "facing": "east" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined", "y": 90 } },
+    { "when": { "part": "base", "facing": "south" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined", "y": 180 } },
+    { "when": { "part": "base", "facing": "west" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined", "y": 270 } },
+    { "when": { "part": "base", "facing": "up" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined" } },
+    { "when": { "part": "base", "facing": "down" }, "apply": { "model": "buildcraft:block/refinery/refinery_tank_combined" } },
+
+    { "when": { "part": "magnet_left", "facing": "north" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left", "y": 0 } },
+    { "when": { "part": "magnet_left", "facing": "east" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left", "y": 90 } },
+    { "when": { "part": "magnet_left", "facing": "south" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left", "y": 180 } },
+    { "when": { "part": "magnet_left", "facing": "west" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left", "y": 270 } },
+    { "when": { "part": "magnet_left", "facing": "up" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left" } },
+    { "when": { "part": "magnet_left", "facing": "down" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_left", "x": 180 } },
+
+    { "when": { "part": "magnet_right", "facing": "north" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right", "y": 0 } },
+    { "when": { "part": "magnet_right", "facing": "east" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right", "y": 90 } },
+    { "when": { "part": "magnet_right", "facing": "south" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right", "y": 180 } },
+    { "when": { "part": "magnet_right", "facing": "west" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right", "y": 270 } },
+    { "when": { "part": "magnet_right", "facing": "up" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right" } },
+    { "when": { "part": "magnet_right", "facing": "down" }, "apply": { "model": "buildcraft:block/refinery/refinery_magnet_right", "x": 180 } }
+  ]
+}

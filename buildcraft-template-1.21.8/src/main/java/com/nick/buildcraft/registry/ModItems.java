@@ -38,6 +38,10 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> MODEL_ITEM_COMBUSTION_ENGINE =
             ITEMS.registerSimpleBlockItem("model_item_combustion_engine", ModBlocks.COMBUSTION_ENGINE);
 
+    public static final DeferredItem<BlockItem> MODEL_ITEM_REFINERY =
+            ITEMS.registerSimpleBlockItem("model_item_refinery", ModBlocks.REFINERY);
+
+
     /* ---------- ITEM PIPES (items moving through pipes) ---------- */
 
     public static final DeferredItem<BlockItem> STONE_PIPE_ITEM =
@@ -89,6 +93,7 @@ public final class ModItems {
 
     public static final DeferredItem<BlockItem> PUMP_ITEM =
             ITEMS.registerSimpleBlockItem("model_item_pump", ModBlocks.PUMP);
+
 
     /* ---------- Gears ---------- */
 

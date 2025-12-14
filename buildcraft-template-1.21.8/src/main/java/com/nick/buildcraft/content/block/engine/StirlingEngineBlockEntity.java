@@ -36,8 +36,16 @@ public class StirlingEngineBlockEntity extends EngineBlockEntity implements Menu
 
     @Override
     protected boolean isActive(BlockState state) {
-        // Engine power output logic; keep your redstone requirement if you want
-        return burnTime > 0 && isBlockPowered(state);
+        // Only requires redstone power for animation
+        // Power generation requires fuel (burnTime > 0), but that's checked separately
+        return isBlockPowered(state);
+    }
+
+    @Override
+    protected int getGenerationPerTick() {
+        // Only generate power if we have fuel burning
+        if (burnTime <= 0) return 0;
+        return super.getGenerationPerTick();
     }
 
     @Override public Component getDisplayName() {

@@ -1,11 +1,32 @@
 {
   "multipart": [
-    { "when": { "part": "base", "facing": "south" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine", "x": 90, "y": 180 } },
-    { "when": { "part": "base", "facing": "west"  }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine", "x": 90, "y": 270 } },
-    { "when": { "part": "base", "facing": "north" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine", "x": 90, "y":   0 } },
-    { "when": { "part": "base", "facing": "east"  }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine", "x": 90, "y":  90 } },
-    { "when": { "part": "base", "facing": "up"    }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine" } },
-    { "when": { "part": "base", "facing": "down"  }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine", "x": 180 } },
+    { "when": { "part": "base", "facing": "south", "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue", "x": 90, "y": 180 } },
+    { "when": { "part": "base", "facing": "west",  "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue", "x": 90, "y": 270 } },
+    { "when": { "part": "base", "facing": "north", "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue", "x": 90, "y":   0 } },
+    { "when": { "part": "base", "facing": "east",  "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue", "x": 90, "y":  90 } },
+    { "when": { "part": "base", "facing": "up",    "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue" } },
+    { "when": { "part": "base", "facing": "down",  "phase": "blue" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_blue", "x": 180 } },
+
+    { "when": { "part": "base", "facing": "south", "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green", "x": 90, "y": 180 } },
+    { "when": { "part": "base", "facing": "west",  "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green", "x": 90, "y": 270 } },
+    { "when": { "part": "base", "facing": "north", "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green", "x": 90, "y":   0 } },
+    { "when": { "part": "base", "facing": "east",  "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green", "x": 90, "y":  90 } },
+    { "when": { "part": "base", "facing": "up",    "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green" } },
+    { "when": { "part": "base", "facing": "down",  "phase": "green" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_green", "x": 180 } },
+
+    { "when": { "part": "base", "facing": "south", "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange", "x": 90, "y": 180 } },
+    { "when": { "part": "base", "facing": "west",  "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange", "x": 90, "y": 270 } },
+    { "when": { "part": "base", "facing": "north", "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange", "x": 90, "y":   0 } },
+    { "when": { "part": "base", "facing": "east",  "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange", "x": 90, "y":  90 } },
+    { "when": { "part": "base", "facing": "up",    "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange" } },
+    { "when": { "part": "base", "facing": "down",  "phase": "orange" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_orange", "x": 180 } },
+
+    { "when": { "part": "base", "facing": "south", "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red", "x": 90, "y": 180 } },
+    { "when": { "part": "base", "facing": "west",  "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red", "x": 90, "y": 270 } },
+    { "when": { "part": "base", "facing": "north", "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red", "x": 90, "y":   0 } },
+    { "when": { "part": "base", "facing": "east",  "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red", "x": 90, "y":  90 } },
+    { "when": { "part": "base", "facing": "up",    "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red" } },
+    { "when": { "part": "base", "facing": "down",  "phase": "red" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_red", "x": 180 } },
 
     { "when": { "part": "ring" },    "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_ring" } },
     { "when": { "part": "bellows" }, "apply": { "model": "buildcraft:block/engines/stirling/stirling_engine_bellows" } }

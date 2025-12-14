@@ -7,6 +7,7 @@ import com.nick.buildcraft.content.block.engine.EngineBlock;
 import com.nick.buildcraft.content.block.engine.EngineBlockEntity;
 import com.nick.buildcraft.content.block.engine.RedstoneEngineBlock;
 import com.nick.buildcraft.content.block.engine.StirlingEngineBlock;   // NEW
+import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -34,7 +35,8 @@ public final class EngineRenderer implements BlockEntityRenderer<EngineBlockEnti
         final BlockState state = be.getBlockState();
         final boolean isRed = state.getBlock() instanceof RedstoneEngineBlock;
         final boolean isSti = state.getBlock() instanceof StirlingEngineBlock;
-        if (!isRed && !isSti) return; // only render for our engine blocks
+        final boolean isCom = state.getBlock() instanceof CombustionEngineBlock;
+        if (!isRed && !isSti && !isCom) return; // only render for our engine blocks
 
         final var level = be.getLevel();
         final BlockPos pos = be.getBlockPos();
@@ -59,7 +61,9 @@ public final class EngineRenderer implements BlockEntityRenderer<EngineBlockEnti
         BlockState bellows = isRed
                 ? state.setValue(RedstoneEngineBlock.PART, RedstoneEngineBlock.Part.BELLOWS)
                 .setValue(EngineBlock.FACING, Direction.UP)
-                : state.setValue(StirlingEngineBlock.PART, StirlingEngineBlock.Part.BELLOWS)
+                : isSti ? state.setValue(StirlingEngineBlock.PART, StirlingEngineBlock.Part.BELLOWS)
+                .setValue(EngineBlock.FACING, Direction.UP)
+                : state.setValue(CombustionEngineBlock.PART, CombustionEngineBlock.Part.BELLOWS)
                 .setValue(EngineBlock.FACING, Direction.UP);
 
         dispatcher.renderSingleBlock(bellows, pose, buf, lightForParts, packedOverlay, level, pos);
@@ -73,7 +77,9 @@ public final class EngineRenderer implements BlockEntityRenderer<EngineBlockEnti
         BlockState ring = isRed
                 ? state.setValue(RedstoneEngineBlock.PART, RedstoneEngineBlock.Part.RING)
                 .setValue(EngineBlock.FACING, Direction.UP)
-                : state.setValue(StirlingEngineBlock.PART, StirlingEngineBlock.Part.RING)
+                : isSti ? state.setValue(StirlingEngineBlock.PART, StirlingEngineBlock.Part.RING)
+                .setValue(EngineBlock.FACING, Direction.UP)
+                : state.setValue(CombustionEngineBlock.PART, CombustionEngineBlock.Part.RING)
                 .setValue(EngineBlock.FACING, Direction.UP);
 
         dispatcher.renderSingleBlock(ring, pose, buf, lightForParts, packedOverlay, level, pos);

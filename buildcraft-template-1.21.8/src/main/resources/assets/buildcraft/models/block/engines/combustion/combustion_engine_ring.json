@@ -1,0 +1,44 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout_mipped",
+  "textures": {
+    "ring_side": "buildcraft:block/engines/combustion_engine/side",
+    "ring_top":  "buildcraft:block/engines/combustion_engine/back",
+    "particle":  "buildcraft:block/engines/combustion_engine/side"
+  },
+  "elements": [
+    { "from":[0,4,0],     "to":[16,8,4.1],
+      "faces": {
+        "north":{"texture":"#ring_side"}, "south":{"texture":"#ring_side"},
+        "west":{"texture":"#ring_side"},  "east":{"texture":"#ring_side"},
+        "up":{"texture":"#ring_top","uv":[0,0,16,4]},
+        "down":{"texture":"#ring_top","uv":[0,0,16,4]}
+      }
+    },
+    { "from":[0,4,11.9],  "to":[16,8,16],
+      "faces": {
+        "north":{"texture":"#ring_side"}, "south":{"texture":"#ring_side"},
+        "west":{"texture":"#ring_side"},  "east":{"texture":"#ring_side"},
+        "up":{"texture":"#ring_top","uv":[0,12,16,16]},
+        "down":{"texture":"#ring_top","uv":[0,12,16,16]}
+      }
+    },
+    { "from":[0,4,4],     "to":[4.1,8,12],
+      "faces": {
+        "north":{"texture":"#ring_side"}, "south":{"texture":"#ring_side"},
+        "west":{"texture":"#ring_side"},  "east":{"texture":"#ring_side"},
+        "up":{"texture":"#ring_top","uv":[0,4,4,12]},
+        "down":{"texture":"#ring_top","uv":[0,4,4,12]}
+      }
+    },
+    { "from":[11.9,4,4],  "to":[16,8,12],
+      "faces": {
+        "north":{"texture":"#ring_side"}, "south":{"texture":"#ring_side"},
+        "west":{"texture":"#ring_side"},  "east":{"texture":"#ring_side"},
+        "up":{"texture":"#ring_top","uv":[12,4,16,12]},
+        "down":{"texture":"#ring_top","uv":[12,4,16,12]}
+      }
+    }
+  ]
+}

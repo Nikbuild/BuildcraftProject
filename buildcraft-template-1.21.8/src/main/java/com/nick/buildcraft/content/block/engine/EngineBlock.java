@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -33,6 +34,7 @@ import net.minecraft.world.phys.shapes.*;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 
 // NeoForge
@@ -55,7 +57,14 @@ public class EngineBlock extends BaseEngineBlock {
         }
     }
 
-    /** Orientation axis of the engine (where its “core” points). */
+    /** Engine heat phase for texture selection (BLUE, GREEN, ORANGE, RED). */
+    public enum Phase implements StringRepresentable {
+        BLUE, GREEN, ORANGE, RED;
+        @Override public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
+    }
+    public static final EnumProperty<Phase> PHASE = EnumProperty.create("phase", Phase.class);
+
+    /** Orientation axis of the engine (where its "core" points). */
     public static final EnumProperty<Direction> FACING =
             EnumProperty.create("facing", Direction.class, Direction.values());
 
@@ -70,7 +79,8 @@ public class EngineBlock extends BaseEngineBlock {
         registerDefaultState(this.stateDefinition.any()
                 .setValue(BlockStateProperties.POWERED, Boolean.FALSE)
                 .setValue(FACING, Direction.NORTH)
-                .setValue(PULSING, Boolean.FALSE));
+                .setValue(PULSING, Boolean.FALSE)
+                .setValue(PHASE, Phase.BLUE));
     }
 
     public EngineType engineType() { return type; }
@@ -80,6 +90,7 @@ public class EngineBlock extends BaseEngineBlock {
         b.add(BlockStateProperties.POWERED);
         b.add(FACING);
         b.add(PULSING);
+        b.add(PHASE);
     }
 
     /* -----------------------------------------------------------------------

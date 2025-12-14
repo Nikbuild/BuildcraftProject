@@ -2,6 +2,7 @@ package com.nick.buildcraft.content.block.refinery;
 
 import com.nick.buildcraft.api.engine.EnginePowerAcceptorApi;
 import com.nick.buildcraft.api.engine.EnginePulseAcceptorApi;
+import com.nick.buildcraft.content.block.engine.EngineBlockEntity;
 import com.nick.buildcraft.registry.ModFluids;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -35,9 +36,13 @@ public class RefineryBlockEntity extends BlockEntity
     private static final int FUEL_PER_CONVERSION = 1000; // produces 1 bucket fuel per pulse
 
     // Animation parameters
-    private static final int PERIOD = 40;  // ticks per full cycle
+    private static final int PERIOD = 40;  // baseline ticks per full cycle (at 30 RPM for redstone base)
+    private static final int BASE_RPM = 30;  // redstone engine base RPM (1200/40 period)
     public static final double MAGNET_TRAVEL_DISTANCE = 0.75;
     private static final int RESTING_ANIMATION_SPEED = 5; // ticks to reach resting position
+
+    // Engine RPM tracking
+    private int lastQueriedRPM = BASE_RPM;  // RPM from adjacent engines (defaults to base)
 
     // ===== FLUID STORAGE =====
     // Two oil input tanks (visually on the back)
@@ -104,6 +109,9 @@ public class RefineryBlockEntity extends BlockEntity
 
         boolean wasPowered = entity.isActive;
 
+        // Query adjacent engines every tick to catch RPM/phase changes immediately
+        entity.lastQueriedRPM = entity.getAdjacentEngineRPM(level, pos);
+
         // Active if we have queued pulses
         entity.isActive = entity.queuedPulses > 0;
 
@@ -132,6 +140,9 @@ public class RefineryBlockEntity extends BlockEntity
         // Client-side animation updates
         entity.magnet1ProgressO = entity.magnet1Progress;
         entity.magnet2ProgressO = entity.magnet2Progress;
+
+        // Query adjacent engines every tick on client too for real-time animation updates
+        entity.lastQueriedRPM = entity.getAdjacentEngineRPM(level, pos);
 
         if (entity.isActive) {
             entity.updateActiveAnimation();
@@ -184,9 +195,13 @@ public class RefineryBlockEntity extends BlockEntity
     // ===== ANIMATION LOGIC =====
 
     private void updateActiveAnimation() {
+        // Calculate dynamic period based on engine RPM
+        // Scale inversely: higher RPM = smaller period = faster animation
+        float dynamicPeriod = (float) PERIOD * BASE_RPM / Math.max(lastQueriedRPM, 1);
+
         // Sinusoidal movement for magnet 1
         pumpTick++;
-        float theta1 = (float) (2.0 * Math.PI * pumpTick / PERIOD);
+        float theta1 = (float) (2.0 * Math.PI * pumpTick / dynamicPeriod);
         magnet1Progress = (float) ((1.0 + Math.sin(theta1)) / 2.0); // 0..1
 
         // Magnet 2 is 180° out of phase
@@ -457,5 +472,30 @@ public class RefineryBlockEntity extends BlockEntity
         oilTank1.deserialize(in.childOrEmpty("OilTank1"));
         oilTank2.deserialize(in.childOrEmpty("OilTank2"));
         fuelTank.deserialize(in.childOrEmpty("FuelTank"));
+    }
+
+    // ===== ENGINE RPM QUERYING =====
+
+    /**
+     * Queries adjacent block entities for engines and returns the highest RPM found.
+     * Searches in all 6 directions (up, down, north, south, east, west).
+     */
+    private int getAdjacentEngineRPM(Level level, BlockPos pos) {
+        int maxRPM = BASE_RPM;  // Default to base if no engines found
+
+        // Check all 6 directions
+        for (Direction direction : Direction.values()) {
+            BlockPos neighborPos = pos.relative(direction);
+            BlockEntity neighborEntity = level.getBlockEntity(neighborPos);
+
+            if (neighborEntity instanceof EngineBlockEntity engine) {
+                int engineRPM = engine.getRPM();
+                if (engineRPM > maxRPM) {
+                    maxRPM = engineRPM;
+                }
+            }
+        }
+
+        return maxRPM;
     }
 }

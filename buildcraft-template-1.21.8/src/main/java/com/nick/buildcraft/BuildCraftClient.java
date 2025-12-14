@@ -8,6 +8,7 @@ import com.nick.buildcraft.client.render.PumpRenderer;
 import com.nick.buildcraft.client.render.QuarryRenderer;
 import com.nick.buildcraft.client.render.RefineryRenderer;
 import com.nick.buildcraft.client.render.StonePipeRenderer;
+import com.nick.buildcraft.client.screen.CombustionEngineScreen;
 import com.nick.buildcraft.client.screen.DiamondPipeScreen;
 import com.nick.buildcraft.client.screen.StirlingEngineScreen;
 import com.nick.buildcraft.content.block.tank.TankBlockEntityRenderer;
@@ -82,6 +83,7 @@ public final class BuildCraftClient {
     @SubscribeEvent
     static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.STIRLING_ENGINE.get(), StirlingEngineScreen::new);
+        event.register(ModMenus.COMBUSTION_ENGINE.get(), CombustionEngineScreen::new);
         event.register(ModMenus.DIAMOND_PIPE.get(), DiamondPipeScreen::new);
     }
 

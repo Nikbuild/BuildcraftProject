@@ -1,0 +1,12 @@
+{
+  "textures": {
+    "accordion": "buildcraft:block/engines/combustion_engine/chamber_base",
+    "particle":  "buildcraft:block/engines/combustion_engine/chamber_base"
+  },
+  "elements": [
+    { "from":[1,   4, 1],    "to":[15, 12, 1.5],  "faces":{ "north":{"texture":"#accordion"}, "south":{"texture":"#accordion"} } },
+    { "from":[1,   4, 14.5], "to":[15, 12, 15],   "faces":{ "north":{"texture":"#accordion"}, "south":{"texture":"#accordion"} } },
+    { "from":[1,   4, 1.5],  "to":[1.5,12, 14.5], "faces":{ "west":{"texture":"#accordion"},  "east":{"texture":"#accordion"} } },
+    { "from":[14.5,4, 1.5],  "to":[15, 12, 14.5], "faces":{ "west":{"texture":"#accordion"},  "east":{"texture":"#accordion"} } }
+  ]
+}

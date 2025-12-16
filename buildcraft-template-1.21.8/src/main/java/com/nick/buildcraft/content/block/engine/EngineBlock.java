@@ -1,6 +1,7 @@
 package com.nick.buildcraft.content.block.engine;
 
 import com.nick.buildcraft.BuildCraft;
+import com.nick.buildcraft.api.wrench.Wrenchable;
 import com.nick.buildcraft.content.block.pipe.WoodPipeBlock;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import com.nick.buildcraft.registry.ModTags;
@@ -9,6 +10,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -28,6 +31,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.*;
 
@@ -41,7 +45,7 @@ import java.util.Map;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
-public class EngineBlock extends BaseEngineBlock {
+public class EngineBlock extends BaseEngineBlock implements Wrenchable {
 
     /* --------------------- static base shapes (local UP) --------------------- */
 
@@ -283,15 +287,53 @@ public class EngineBlock extends BaseEngineBlock {
         return rotate(s, m.getRotation(s.getValue(FACING)));
     }
 
+    /* -------------------------------- wrench support -------------------------------- */
+
+    @Override
+    public InteractionResult onWrench(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        if (level.isClientSide) return InteractionResult.SUCCESS;
+
+        // Cycle to the next valid facing direction
+        Direction current = state.getValue(FACING);
+        Direction next = getNextFacing(current);
+
+        // Keep cycling until we find a valid facing (can accept power)
+        int attempts = 0;
+        while (attempts < 6) {
+            if (isFacingValid(level, pos, next)) {
+                break;
+            }
+            next = getNextFacing(next);
+            attempts++;
+        }
+
+        BlockState updated = state.setValue(FACING, next);
+        level.setBlock(pos, updated, Block.UPDATE_CLIENTS);
+        level.levelEvent(2001, pos, Block.getId(updated));
+        return InteractionResult.SUCCESS;
+    }
+
+    private static Direction getNextFacing(Direction current) {
+        return switch (current) {
+            case NORTH -> Direction.SOUTH;
+            case SOUTH -> Direction.EAST;
+            case EAST -> Direction.WEST;
+            case WEST -> Direction.UP;
+            case UP -> Direction.DOWN;
+            case DOWN -> Direction.NORTH;
+        };
+    }
+
     /* --------------------------------- ticker ---------------------------------- */
 
-    @SuppressWarnings("unchecked")
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level lvl, BlockState st, BlockEntityType<T> beType) {
         if (beType != ModBlockEntity.ENGINE.get()) return null;
         BlockEntityTicker<EngineBlockEntity> ticker =
                 lvl.isClientSide ? EngineBlockEntity::clientTick : EngineBlockEntity::serverTick;
+        // TODO: Generic type cast required by Minecraft API - BlockEntityTicker<EngineBlockEntity> -> BlockEntityTicker<T>
+        // This is unavoidable due to Java's type erasure. At runtime, T will always be EngineBlockEntity when beType matches.
         return (BlockEntityTicker<T>) ticker;
     }
 

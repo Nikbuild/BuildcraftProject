@@ -1,8 +1,11 @@
 package com.nick.buildcraft.content.block.pump;
 
+import com.nick.buildcraft.api.wrench.Wrenchable;
 import com.nick.buildcraft.registry.ModBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -14,6 +17,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * BuildCraft Pump controller block.
@@ -26,7 +30,7 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
  * The "tube" below it is NOT a block. It's rendered by PumpRenderer
  * using data synced from the PumpBlockEntity.
  */
-public class PumpBlock extends Block implements EntityBlock {
+public class PumpBlock extends Block implements EntityBlock, Wrenchable {
 
     public static final EnumProperty<Direction> FACING = HorizontalDirectionalBlock.FACING;
 
@@ -51,6 +55,23 @@ public class PumpBlock extends Block implements EntityBlock {
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         // Face the same way the player is looking horizontally.
         return this.defaultBlockState().setValue(FACING, ctx.getHorizontalDirection());
+    }
+
+    /* ------------------------------------------------------------ */
+    /* Wrench support                                                */
+    /* ------------------------------------------------------------ */
+
+    @Override
+    public InteractionResult onWrench(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        if (level.isClientSide) return InteractionResult.SUCCESS;
+
+        Direction current = state.getValue(FACING);
+        Direction next = current.getClockWise();
+
+        BlockState updated = state.setValue(FACING, next);
+        level.setBlock(pos, updated, Block.UPDATE_CLIENTS);
+        level.levelEvent(2001, pos, Block.getId(updated));
+        return InteractionResult.SUCCESS;
     }
 
     /* ------------------------------------------------------------ */

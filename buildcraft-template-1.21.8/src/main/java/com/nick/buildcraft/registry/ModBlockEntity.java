@@ -1,6 +1,8 @@
 package com.nick.buildcraft.registry;
 
 import com.nick.buildcraft.BuildCraft;
+import com.nick.buildcraft.content.block.engine.CombustionEngineBlock;
+import com.nick.buildcraft.content.block.engine.CombustionEngineBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineBlock;
 import com.nick.buildcraft.content.block.engine.EngineBlockEntity;
 import com.nick.buildcraft.content.block.engine.EngineRingMovingBlockEntity;
@@ -129,6 +131,7 @@ public final class ModBlockEntity {
      * All engines (redstone / stirling / combustion) share one BlockEntityType.
      *
      * Factory chooses subclass:
+     *  - CombustionEngineBlockEntity if it's specifically a CombustionEngineBlock
      *  - StirlingEngineBlockEntity if it's specifically a StirlingEngineBlock (has burnable fuel)
      *  - Otherwise EngineBlockEntity, with EngineType pulled from the block
      *  - Final fallback is REDSTONE
@@ -138,6 +141,9 @@ public final class ModBlockEntity {
                     "engine",
                     () -> new BlockEntityType<>(
                             (pos, state) -> {
+                                if (state.getBlock() instanceof CombustionEngineBlock) {
+                                    return new CombustionEngineBlockEntity(pos, state);
+                                }
                                 if (state.getBlock() instanceof StirlingEngineBlock) {
                                     return new StirlingEngineBlockEntity(pos, state);
                                 }

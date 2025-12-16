@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["IGI", " I ", " R "],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:gold_ingot",
+    "R": "minecraft:redstone"
+  },
+  "result": { "id": "buildcraft:wrench", "count": 1 }
+}

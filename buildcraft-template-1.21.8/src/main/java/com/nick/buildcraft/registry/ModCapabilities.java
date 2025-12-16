@@ -1,5 +1,6 @@
 package com.nick.buildcraft.registry;
 
+import com.nick.buildcraft.content.block.engine.CombustionEngineBlockEntity;
 import com.nick.buildcraft.content.block.fluidpipe.FluidPipeBlockEntity;
 import com.nick.buildcraft.content.block.miningwell.MiningWellBlockEntity;
 import com.nick.buildcraft.content.block.pump.PumpBlockEntity;
@@ -116,6 +117,26 @@ public final class ModCapabilities {
         );
 
         /* ------------------------------------------------------------------
+         * COMBUSTION ENGINE
+         * ------------------------------------------------------------------ */
+
+        // expose fuel tank (left) and coolant tank (right) as fluid handlers
+        // Players can right-click with buckets to fill/drain
+        event.registerBlockEntity(
+                Capabilities.FluidHandler.BLOCK,
+                ModBlockEntity.ENGINE.get(),
+                (be, side) -> {
+                    if (be instanceof CombustionEngineBlockEntity cbe) {
+                        // For now, expose both tanks merged
+                        // In a real implementation, you could have separate handlers per side
+                        // For simplicity, we'll create a merged handler
+                        return new CombustionEngineFuelHandler(cbe);
+                    }
+                    return null;
+                }
+        );
+
+        /* ------------------------------------------------------------------
          * REFINERY
          * ------------------------------------------------------------------ */
 
@@ -166,5 +187,66 @@ public final class ModCapabilities {
                 ModBlockEntity.REFINERY.get(),
                 (RefineryBlockEntity be, @Nullable Direction side) -> be.getFluidHandlerForSide(side)
         );
+    }
+
+    /**
+     * Simple handler that allows filling/draining the combustion engine's fuel tank with buckets.
+     */
+    private static class CombustionEngineFuelHandler implements IFluidHandler {
+        private final CombustionEngineBlockEntity be;
+
+        private CombustionEngineFuelHandler(CombustionEngineBlockEntity be) {
+            this.be = be;
+        }
+
+        @Override
+        public int getTanks() {
+            return 2; // fuel + coolant
+        }
+
+        @Override
+        public net.neoforged.neoforge.fluids.FluidStack getFluidInTank(int tank) {
+            return tank == 0 ? be.getFuelTank().getFluid() : be.getCoolantTank().getFluid();
+        }
+
+        @Override
+        public int getTankCapacity(int tank) {
+            return tank == 0 ? be.getFuelTank().getCapacity() : be.getCoolantTank().getCapacity();
+        }
+
+        @Override
+        public boolean isFluidValid(int tank, net.neoforged.neoforge.fluids.FluidStack stack) {
+            return tank == 0 ? be.getFuelTank().isFluidValid(stack) : be.getCoolantTank().isFluidValid(stack);
+        }
+
+        @Override
+        public int fill(net.neoforged.neoforge.fluids.FluidStack resource, FluidAction action) {
+            // Determine which tank based on fluid type
+            if (resource.getFluid() == ModFluids.FUEL.get()) {
+                return be.getFuelTank().fill(resource, action);
+            } else {
+                // Assume anything else goes to coolant
+                return be.getCoolantTank().fill(resource, action);
+            }
+        }
+
+        @Override
+        public net.neoforged.neoforge.fluids.FluidStack drain(int maxDrain, FluidAction action) {
+            // Drain from fuel tank first
+            net.neoforged.neoforge.fluids.FluidStack drained = be.getFuelTank().drain(maxDrain, action);
+            if (drained.isEmpty()) {
+                drained = be.getCoolantTank().drain(maxDrain, action);
+            }
+            return drained;
+        }
+
+        @Override
+        public net.neoforged.neoforge.fluids.FluidStack drain(net.neoforged.neoforge.fluids.FluidStack resource, FluidAction action) {
+            if (resource.getFluid() == ModFluids.FUEL.get()) {
+                return be.getFuelTank().drain(resource, action);
+            } else {
+                return be.getCoolantTank().drain(resource, action);
+            }
+        }
     }
 }

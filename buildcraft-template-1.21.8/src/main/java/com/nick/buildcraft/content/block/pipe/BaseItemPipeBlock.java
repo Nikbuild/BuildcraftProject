@@ -38,7 +38,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
  */
 public abstract class BaseItemPipeBlock extends Block implements EntityBlock {
 
-    public enum PipeFamily { STONE, COBBLE, GOLD, IRON, DIAMOND, WOOD, GENERIC }
+    public enum PipeFamily { STONE, COBBLE, GOLD, IRON, DIAMOND, WOOD, SANDSTONE, GENERIC }
 
     private final PipeFamily family;
 

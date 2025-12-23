@@ -5,7 +5,8 @@ import net.minecraft.world.phys.Vec3;
 
 /** Data copied from the entity for rendering. Coords are ENTITY-LOCAL. */
 public class LaserEntityRenderState extends EntityRenderState {
-    public int color;  // RGB
-    public Vec3 start; // local to entity origin
-    public Vec3 end;   // local to entity origin
+    public int color;       // RGB
+    public Vec3 start;      // local to entity origin
+    public Vec3 end;        // local to entity origin
+    public int textureType; // 0 = default red, 1 = tape measure
 }

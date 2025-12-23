@@ -90,11 +90,13 @@ public class QuarryBlock extends Block implements EntityBlock, Wrenchable {
     }
 
     // Central cleanup: runs for ALL removals (player, explosion, piston, etc.)
+    // NOTE: Frame blocks are now persistent - they stay even when controller is removed
     @Override
     public void destroy(LevelAccessor level, BlockPos pos, BlockState state) {
-        if (level instanceof ServerLevel serverLevel) {
-            clearStructure(serverLevel, pos, state);
-        }
+        // Don't clear frame blocks on controller removal - let players keep the physical frame structure
+        // if (level instanceof ServerLevel serverLevel) {
+        //     clearStructure(serverLevel, pos, state);
+        // }
         super.destroy(level, pos, state);
     }
 
@@ -106,16 +108,31 @@ public class QuarryBlock extends Block implements EntityBlock, Wrenchable {
     public InteractionResult onWrench(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
 
+        // Prevent rotation if quarry is currently mining (check both redstone power and engine power)
+        // This protects against losing mining progress and frame corruption mid-operation
+        boolean isPowered = state.getValue(POWERED) || level.hasNeighborSignal(pos);
+
+        // Also check if quarry is receiving energy from an engine
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof QuarryBlockEntity qbe) {
+            if (qbe.energy.getEnergyStored() > 0) {
+                isPowered = true; // Consider it powered if it has energy
+            }
+        }
+
+        if (isPowered) {
+            return InteractionResult.FAIL;
+        }
+
         Direction current = state.getValue(FACING);
         Direction next = current.getClockWise();
 
         BlockState updated = state.setValue(FACING, next);
         level.setBlock(pos, updated, Block.UPDATE_CLIENTS);
 
-        // Clear old frame structure and let the quarry rebuild for new direction
-        if (level instanceof ServerLevel serverLevel) {
-            clearStructure(serverLevel, pos, state);
-        }
+        // Frame blocks are persistent - don't clear them on rotation
+        // The quarry will rebuild/validate frames in the new orientation as needed
+        // Old frames from previous orientation will remain for players to manually remove
 
         level.levelEvent(2001, pos, Block.getId(updated));
         return InteractionResult.SUCCESS;
@@ -132,9 +149,11 @@ public class QuarryBlock extends Block implements EntityBlock, Wrenchable {
 
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return type == ModBlockEntity.QUARRY_CONTROLLER.get() && !level.isClientSide
-                ? (lvl, p, st, be) -> QuarryBlockEntity.serverTick(lvl, p, st, (QuarryBlockEntity) be)
-                : null;
+        if (type != ModBlockEntity.QUARRY_CONTROLLER.get()) return null;
+
+        return level.isClientSide
+                ? (lvl, p, st, be) -> QuarryBlockEntity.clientTick(lvl, p, st, (QuarryBlockEntity) be)
+                : (lvl, p, st, be) -> QuarryBlockEntity.serverTick(lvl, p, st, (QuarryBlockEntity) be);
     }
 
     /* -------------------------------------------------------------------------------------------------------------- */

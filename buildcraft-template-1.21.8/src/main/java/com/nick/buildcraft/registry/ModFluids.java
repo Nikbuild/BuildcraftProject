@@ -76,6 +76,7 @@ public final class ModFluids {
                             .noCollission()
                             .strength(100.0F)
                             .noLootTable()
+                            .replaceable()
                             .setId(ResourceKey.create(Registries.BLOCK, key))
             ));
 
@@ -126,6 +127,7 @@ public final class ModFluids {
                             .noCollission()
                             .strength(100.0F)
                             .noLootTable()
+                            .replaceable()
                             .setId(ResourceKey.create(Registries.BLOCK, key))
             ));
 

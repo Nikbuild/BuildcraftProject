@@ -26,6 +26,8 @@ public class LaserEntity extends Entity {
             SynchedEntityData.defineId(LaserEntity.class, EntityDataSerializers.VECTOR3);
     private static final EntityDataAccessor<Vector3f> END =
             SynchedEntityData.defineId(LaserEntity.class, EntityDataSerializers.VECTOR3);
+    private static final EntityDataAccessor<Integer> TEXTURE_TYPE =
+            SynchedEntityData.defineId(LaserEntity.class, EntityDataSerializers.INT);
 
     public LaserEntity(EntityType<? extends LaserEntity> type, Level level) {
         super(type, level);
@@ -36,10 +38,14 @@ public class LaserEntity extends Entity {
         b.define(COLOR, 0xFF0000);
         b.define(START, new Vector3f(0f, 0f, 0f));
         b.define(END,   new Vector3f(0f, 0f, 0f));
+        b.define(TEXTURE_TYPE, 0);  // 0 = default red, 1 = tape measure
     }
 
     public void setColor(int color) { this.entityData.set(COLOR, color); }
     public int  getColor()          { return this.entityData.get(COLOR); }
+
+    public void setTextureType(int type) { this.entityData.set(TEXTURE_TYPE, type); }
+    public int  getTextureType()         { return this.entityData.get(TEXTURE_TYPE); }
 
     public void setEndpoints(Vec3 start, Vec3 end) {
         this.entityData.set(START, toV3f(start));
@@ -66,6 +72,7 @@ public class LaserEntity extends Entity {
     @Override
     protected void readAdditionalSaveData(ValueInput in) {
         setColor(in.getIntOr("Color", 0xFF0000));
+        setTextureType(in.getIntOr("TextureType", 0));
         Vec3 s = new Vec3(in.getDoubleOr("StartX", 0), in.getDoubleOr("StartY", 0), in.getDoubleOr("StartZ", 0));
         Vec3 e = new Vec3(in.getDoubleOr("EndX", 0),   in.getDoubleOr("EndY", 0),   in.getDoubleOr("EndZ", 0));
         setEndpoints(s, e);
@@ -75,6 +82,7 @@ public class LaserEntity extends Entity {
     @Override
     protected void addAdditionalSaveData(ValueOutput out) {
         out.putInt("Color", getColor());
+        out.putInt("TextureType", getTextureType());
         Vec3 s = getStart(), e = getEnd();
         out.putDouble("StartX", s.x); out.putDouble("StartY", s.y); out.putDouble("StartZ", s.z);
         out.putDouble("EndX",   e.x); out.putDouble("EndY",   e.y); out.putDouble("EndZ",   e.z);

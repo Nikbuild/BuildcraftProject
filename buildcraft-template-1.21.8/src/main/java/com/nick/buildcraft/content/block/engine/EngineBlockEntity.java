@@ -24,7 +24,7 @@ import java.util.List;
 
 public class EngineBlockEntity extends BaseEngineBlockEntity {
     private static final double PUSH_EPSILON = 1.0E-5;
-    private static final int FE_PER_PULSE = 80;
+    private static final int FE_PER_PULSE = com.nick.buildcraft.energy.Energy.ENGINE_ENERGY_PER_PUMP;
 
     // Base periods for BLUE phase (matched to original Buildcraft 1.6.4 speeds):
     // Redstone (Wood): BLUE=0.0167, GREEN=0.033, YELLOW=0.067, RED=0.133 (20% slower)

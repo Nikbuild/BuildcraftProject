@@ -15,9 +15,6 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Shared logic for all engine BEs:
  * - warmup/generation
@@ -53,24 +50,18 @@ public abstract class BaseEngineBlockEntity extends BlockEntity {
             be.warmupTicks = Math.max(0, be.warmupTicks - 2);
         }
 
-        // push FE to neighbors (shared budget); face first
-        List<Direction> order = new ArrayList<>(6);
+        // Push FE ONLY to the facing side (not to all neighbors)
         Direction facing = state.hasProperty(EngineBlock.FACING) ? state.getValue(EngineBlock.FACING) : null;
-        if (facing != null) order.add(facing);
-        for (Direction d : Direction.values()) if (d != facing) order.add(d);
-
-        int remaining = Math.min(be.buffer.getEnergyStored(), Energy.ENGINE_MAX_IO);
-        if (remaining > 0) {
-            for (Direction dir : order) {
+        if (facing != null) {
+            int available = Math.min(be.buffer.getEnergyStored(), Energy.ENGINE_MAX_IO);
+            if (available > 0) {
                 IEnergyStorage neighbor = level.getCapability(
-                        Capabilities.EnergyStorage.BLOCK, pos.relative(dir), dir.getOpposite());
-                if (neighbor == null || !neighbor.canReceive()) continue;
-
-                int sent = neighbor.receiveEnergy(remaining, false);
-                if (sent > 0) {
-                    be.buffer.extractEnergy(sent, false);
-                    remaining -= sent;
-                    if (remaining <= 0) break;
+                        Capabilities.EnergyStorage.BLOCK, pos.relative(facing), facing.getOpposite());
+                if (neighbor != null && neighbor.canReceive()) {
+                    int sent = neighbor.receiveEnergy(available, false);
+                    if (sent > 0) {
+                        be.buffer.extractEnergy(sent, false);
+                    }
                 }
             }
         }
@@ -79,6 +70,8 @@ public abstract class BaseEngineBlockEntity extends BlockEntity {
     }
 
     protected int warmupTicks() { return warmupTicks; }
+
+    public BCEnergyStorage getEnergyBuffer() { return buffer; }
 
     @Override
     protected void loadAdditional(ValueInput in) {

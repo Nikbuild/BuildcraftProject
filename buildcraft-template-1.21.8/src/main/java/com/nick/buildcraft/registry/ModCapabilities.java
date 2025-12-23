@@ -48,7 +48,8 @@ public final class ModCapabilities {
                 (QuarryBlockEntity be, @Nullable Direction side) -> null
         );
 
-        // accepts FE
+        // Dummy energy capability for engine auto-rotation detection
+        // Quarry doesn't actually buffer energy, but uses this for engine detection
         event.registerBlockEntity(
                 Capabilities.EnergyStorage.BLOCK,
                 ModBlockEntity.QUARRY_CONTROLLER.get(),

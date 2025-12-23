@@ -16,9 +16,13 @@ import org.joml.Vector3f;
 
 public class LaserEntityRenderer extends EntityRenderer<LaserEntity, LaserEntityRenderState> {
 
-    private static final ResourceLocation TEXTURE =
+    private static final ResourceLocation TEXTURE_DEFAULT =
             ResourceLocation.fromNamespaceAndPath("buildcraft",
                     "textures/entity/laser/quarry_marker_laser_guide_wire.png");
+
+    private static final ResourceLocation TEXTURE_TAPE_MEASURE =
+            ResourceLocation.fromNamespaceAndPath("buildcraft",
+                    "textures/entity/laser/tape_measure.png");
 
     // thickness (half-extents) of the rectangular beam
     private static final float HALF_W = 1f / 64f;
@@ -38,6 +42,7 @@ public class LaserEntityRenderer extends EntityRenderer<LaserEntity, LaserEntity
         s.color = e.getColor();
         s.start = e.getStart();
         s.end   = e.getEnd();
+        s.textureType = e.getTextureType();
     }
 
     /** Use an AABB from start→end so the beam isn’t culled when the midpoint box leaves the frustum. */
@@ -57,10 +62,13 @@ public class LaserEntityRenderer extends EntityRenderer<LaserEntity, LaserEntity
         if (s.start == null || s.end == null) return;
         if (s.start.distanceToSqr(s.end) < 1.0E-6) return;
 
-        // No face culling so it's visible from any angle
-        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
+        // Select texture based on type
+        ResourceLocation texture = (s.textureType == 1) ? TEXTURE_TAPE_MEASURE : TEXTURE_DEFAULT;
 
-        // Work in space centered at the entity’s midpoint (entity should already be positioned there)
+        // No face culling so it's visible from any angle
+        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
+
+        // Work in space centered at the entity's midpoint (entity should already be positioned there)
         Vec3 mid = s.start.add(s.end).scale(0.5);
         Vec3 a = s.start.subtract(mid);
         Vec3 b = s.end.subtract(mid);

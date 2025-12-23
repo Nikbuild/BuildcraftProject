@@ -39,8 +39,8 @@ public class MiningWellBlockEntity extends BlockEntity
         implements EnginePulseAcceptorApi, EnginePowerAcceptorApi {
 
     private static final int MAX_DEPTH = 256;
-    private static final int BASE_FE_PER_BLOCK = Energy.QUARRY_ENERGY_PER_OPERATION; // 80 FE
-    private static final int FE_PER_PULSE_STEP = 80;                                  // matches engine pulse
+    private static final int BASE_FE_PER_BLOCK = 80; // 80 FE
+    private static final int FE_PER_PULSE_STEP = 80; // matches engine pulse
 
     private final BCEnergyStorage energy = new BCEnergyStorage(200_000, 200_000, s -> setChanged());
 
